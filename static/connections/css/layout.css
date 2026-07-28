@@ -1,0 +1,35 @@
+.page-container {
+  display: grid;
+  height: 100vh;
+  grid-template-columns: 1.6fr 0.4fr;
+  grid-template-rows: 1.5fr 0.5fr;
+  gap: var(--gap);
+  padding: var(--gap);
+}
+
+.grid-template-area {
+  grid-template-areas:
+    "map btns"
+    "log btns";
+}
+
+.map-container {
+  grid-area: map;
+}
+
+#map {
+  height: 100%;
+  filter: saturate(0.85) contrast(1.05);
+}
+
+.command-buttons {
+  overflow-y: scroll;
+  grid-area: btns;
+  display: flex;
+  flex-direction: column;
+}
+
+.log {
+  grid-area: log;
+  overflow-y: auto;
+}
