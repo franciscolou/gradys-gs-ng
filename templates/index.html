@@ -12,6 +12,7 @@
   <body>
     <div class="page-container grid-template-area">
       {% include 'connections/components/_map_panel.html' %}
+      {% include 'connections/components/_row_resizer.html' %}
       {% include 'connections/components/_command_panel.html' %}
       {% include 'connections/components/_log_panel.html' %}
     </div>
@@ -25,6 +26,7 @@
     var serverAddress = "{{server_address}}";
   </script>
   <script src="{% static 'connections/js/main.js' %}"></script>
+  <script src="{% static 'connections/js/panel-resizer.js' %}" defer></script>
 
 </body>
 </html>

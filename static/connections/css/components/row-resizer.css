@@ -1,0 +1,26 @@
+.row-resizer {
+  grid-area: resizer;
+  position: relative;
+  cursor: row-resize;
+  background: var(--color-panel-alt);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  touch-action: none;
+}
+
+.row-resizer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 3px;
+  background: var(--color-accent-dim);
+  transform: translate(-50%, -50%);
+  transition: background-color 120ms linear;
+}
+
+.row-resizer:hover::before,
+.row-resizer.is-dragging::before {
+  background: var(--color-accent);
+}

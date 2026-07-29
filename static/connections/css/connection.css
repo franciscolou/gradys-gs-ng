@@ -2,6 +2,7 @@
 @import url('base.css');
 @import url('layout.css');
 @import url('components/panel.css');
+@import url('components/row-resizer.css');
 @import url('components/select.css');
 @import url('components/button.css');
 @import url('components/checkbox.css');

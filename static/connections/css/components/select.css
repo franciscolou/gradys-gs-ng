@@ -21,11 +21,13 @@
 }
 
 .select-device {
-  width: 16vw;
+  width: clamp(190px, 16vw, 320px);
+  max-width: 100%;
 }
 
 .select-script {
-  width: 12vw;
+  width: clamp(160px, 12vw, 260px);
+  max-width: 100%;
 }
 
 .select-device:focus,

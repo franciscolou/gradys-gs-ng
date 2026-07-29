@@ -23,7 +23,8 @@
   margin-top: 10px;
   background: var(--color-panel);
   color: var(--color-text);
-  width: 16vw;
+  width: clamp(190px, 16vw, 320px);
+  max-width: 100%;
   height: 40px;
   padding: 8px;
   border: 2px solid var(--color-border-strong);
@@ -43,7 +44,7 @@
 }
 
 .button#refresh-file-list {
-  width: 4vw;
+  width: clamp(48px, 4vw, 64px);
   margin-top: 0;
   padding-top: 6px;
 }

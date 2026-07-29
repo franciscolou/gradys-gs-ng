@@ -25,6 +25,7 @@
   --border-width: 2px;
   --chamfer: 10px;
   --gap: 10px;
+  --resizer-height: 10px;
 
   /* Legacy aliases read directly by main.js (getComputedStyle) - keep in sync with --color-accent / --color-text-disabled */
   --primary-color: var(--color-accent);

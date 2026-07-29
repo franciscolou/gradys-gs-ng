@@ -2,7 +2,7 @@
   display: grid;
   height: 100vh;
   grid-template-columns: 1.6fr 0.4fr;
-  grid-template-rows: 1.5fr 0.5fr;
+  grid-template-rows: var(--row-map, 1.5fr) var(--resizer-height) var(--row-log, 0.5fr);
   gap: var(--gap);
   padding: var(--gap);
 }
@@ -10,11 +10,13 @@
 .grid-template-area {
   grid-template-areas:
     "map btns"
+    "resizer btns"
     "log btns";
 }
 
 .map-container {
   grid-area: map;
+  min-height: 0;
 }
 
 #map {
@@ -32,4 +34,37 @@
 .log {
   grid-area: log;
   overflow-y: auto;
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .page-container {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .grid-template-area {
+    grid-template-areas:
+      "map"
+      "btns"
+      "log";
+  }
+
+  .map-container {
+    height: 55vh;
+  }
+
+  .command-buttons {
+    overflow-y: visible;
+  }
+
+  .log {
+    max-height: 35vh;
+  }
+
+  .row-resizer {
+    display: none;
+  }
 }

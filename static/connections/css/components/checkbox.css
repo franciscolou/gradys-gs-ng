@@ -6,7 +6,8 @@
   text-transform: uppercase;
   font-size: 15px;
   margin-top: 10px;
-  width: 16vw;
+  width: clamp(190px, 16vw, 320px);
+  max-width: 100%;
   height: 40px;
   border: 2px solid var(--color-border-strong);
   position: relative;
