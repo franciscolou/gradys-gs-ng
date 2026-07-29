@@ -1,3 +1,18 @@
 <div class="section-container log" id="logs">
-  <div id="actions-logs"></div>
+  <div class="log-toolbar">
+    <div class="log-filter" id="log-filter">
+      <button type="button" class="log-filter-toggle" id="log-filter-toggle" aria-haspopup="true" aria-expanded="false" title="Filter logs by device">
+        <span class="material-symbols-outlined">filter_alt</span>
+      </button>
+      <div class="log-filter-menu" id="log-filter-menu" hidden>
+        <label class="log-filter-option">
+          <input type="checkbox" id="log-filter-all" checked>
+          <span>All devices</span>
+        </label>
+        <div class="log-filter-divider" id="log-filter-divider" hidden></div>
+        <div class="log-filter-devices" id="log-filter-devices"></div>
+      </div>
+    </div>
+  </div>
+  <div class="log-stream" id="actions-logs"></div>
 </div>

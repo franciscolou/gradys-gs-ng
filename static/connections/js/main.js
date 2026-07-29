@@ -17,6 +17,10 @@ var activeDevicesId = []
 // Control if the log text autoscroll is available or not
 var autoScroll = true;
 
+// Filter state: maps a device key (e.g. "UAV-11") to whether its log entries should be shown
+var deviceFilterState = {};
+var logFilterMenuOpen = false;
+
 if(receivePostSocket.readyState === WebSocket.CONNECTING){
   document.querySelector('#ip-connected').innerText = "Background: Connecting";
 }
@@ -108,6 +112,123 @@ function removeCommandOption(id) {
   }
 }
 
+function scrollLogToBottom() {
+  // Scrolls the log stream to its most recent (bottom) entry
+  var elem = document.getElementById('actions-logs');
+  elem.scrollTop = elem.scrollHeight;
+}
+
+function ensureDeviceFilterOption(deviceKey) {
+  // Register a device in the log filter toolbar the first time it's seen.
+  // Subsequent calls for an already-known device are a no-op.
+  if (deviceFilterState.hasOwnProperty(deviceKey)) return;
+  deviceFilterState[deviceKey] = true;
+
+  document.getElementById('log-filter-divider').hidden = false;
+
+  var label = document.createElement('label');
+  label.className = 'log-filter-option';
+
+  var input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = true;
+  input.addEventListener('change', function() {
+    deviceFilterState[deviceKey] = input.checked;
+    syncAllFilterCheckbox();
+    applyDeviceFilterToAllEntries();
+  });
+
+  var span = document.createElement('span');
+  span.textContent = deviceKey;
+
+  label.appendChild(input);
+  label.appendChild(span);
+  document.getElementById('log-filter-devices').appendChild(label);
+}
+
+function syncAllFilterCheckbox() {
+  // Keeps the "All devices" checkbox checked only while every known device is checked
+  var keys = Object.keys(deviceFilterState);
+  var allChecked = keys.every((key) => deviceFilterState[key]);
+  document.getElementById('log-filter-all').checked = allChecked;
+}
+
+function applyDeviceFilterToEntry(p) {
+  // System/command entries have no device key and are always shown
+  var deviceKey = p.dataset.logDevice;
+  if (!deviceKey) return;
+
+  var visible = deviceFilterState[deviceKey] !== false;
+  p.classList.toggle('log-entry-hidden', !visible);
+}
+
+function applyDeviceFilterToAllEntries() {
+  document.querySelectorAll('#actions-logs [data-log-device]').forEach(applyDeviceFilterToEntry);
+}
+
+function buildLogOptions(djangoData) {
+  // Derives filter/seq metadata from a parsed payload, if present
+  var options = {};
+
+  if (djangoData && djangoData.hasOwnProperty('device') && djangoData.hasOwnProperty('id')) {
+    options.deviceKey = `${djangoData['device'].toUpperCase()}-${djangoData['id']}`;
+    ensureDeviceFilterOption(options.deviceKey);
+  }
+
+  if (djangoData && djangoData.hasOwnProperty('seq')) {
+    options.payloadObject = djangoData;
+  }
+
+  return options;
+}
+
+function buildTelemetryFields(djangoData) {
+  // Turns a device info (type 102) payload into labeled fields instead of a raw JSON dump
+  var status = djangoData.hasOwnProperty('status') ? djangoData['status'] : 'active';
+  var lat = parseFloat(djangoData['lat']);
+  var lng = parseFloat(djangoData['lng']);
+  var alt = parseFloat(djangoData['alt']);
+  var time = typeof djangoData['time'] === 'string' ? djangoData['time'].split('T')[1]?.split('.')[0] : undefined;
+
+  var fields = [
+    {value: status, className: `log-status log-status--${status}`},
+    {label: 'lat', value: lat.toFixed(6), className: 'log-coord'},
+    {label: 'lng', value: lng.toFixed(6), className: 'log-coord'},
+    {label: 'alt', value: alt.toFixed(3) + 'm', className: 'log-coord'},
+  ];
+
+  if (djangoData.hasOwnProperty('method')) {
+    fields.push({value: djangoData['method'].toUpperCase(), className: 'log-method'});
+  }
+  if (djangoData.hasOwnProperty('ip')) {
+    fields.push({value: djangoData['ip'], className: 'log-meta'});
+  }
+  if (time) {
+    fields.push({value: time, className: 'log-meta'});
+  }
+
+  return fields;
+}
+
+function appendLogField(parent, field) {
+  var fieldSpan = document.createElement('span');
+  fieldSpan.className = `log-field ${field.className || ''}`;
+
+  if (field.label) {
+    var labelSpan = document.createElement('span');
+    labelSpan.className = 'log-field-label';
+    labelSpan.textContent = field.label;
+    fieldSpan.appendChild(labelSpan);
+  }
+
+  var valueSpan = document.createElement('span');
+  valueSpan.className = 'log-field-value';
+  valueSpan.textContent = field.value;
+  fieldSpan.appendChild(valueSpan);
+
+  parent.appendChild(fieldSpan);
+}
+
 function notifyUiWhenJsonSent(jsonSent, message="Command sent: ") {
   // Insert on interface visual log the command sent.
   var element = document.getElementById('actions-logs');
@@ -115,20 +236,61 @@ function notifyUiWhenJsonSent(jsonSent, message="Command sent: ") {
   p.appendChild(document.createTextNode(message + jsonSent));
   p.className += "json-sent";
 
-  element.prepend(p);
+  element.appendChild(p);
+  if(autoScroll == true) {
+    scrollLogToBottom();
+  }
 }
 
-function notifyUiWhenJsonReceived(jsonReceived, msg) {
+function notifyUiWhenJsonReceived(jsonReceived, msg="", options={}) {
   // Insert on interface visual log the message received
   var element = document.getElementById('actions-logs');
   var p = document.createElement("p");
-  p.appendChild(document.createTextNode(msg + jsonReceived));
   p.className += "json-received";
 
-  element.prepend(p);
+  // A device badge already identifies the source, so the old "UAV-11 info: " text
+  // prefix would just repeat it - keep the plain text prefix only when there's no device
+  if (options.deviceKey) {
+    var deviceBadge = document.createElement("span");
+    deviceBadge.className = "log-device-badge";
+    deviceBadge.textContent = options.deviceKey;
+    p.appendChild(deviceBadge);
+  } else if (msg) {
+    p.appendChild(document.createTextNode(msg));
+  }
+
+  // The seq is only useful as a small orientation counter, so it gets its own
+  // de-emphasized badge instead of being buried (and duplicated) in the raw JSON
+  var seq = options.payloadObject && options.payloadObject.hasOwnProperty('seq') ? options.payloadObject.seq : undefined;
+  if (seq !== undefined) {
+    var seqBadge = document.createElement("span");
+    seqBadge.className = "log-seq";
+    seqBadge.textContent = "#" + seq;
+    p.appendChild(seqBadge);
+  }
+
+  if (options.fields) {
+    p.classList.add('log-entry-structured');
+    options.fields.forEach((field) => appendLogField(p, field));
+  } else {
+    var payloadText = jsonReceived;
+    if (options.payloadObject && seq !== undefined) {
+      var strippedPayload = Object.assign({}, options.payloadObject);
+      delete strippedPayload.seq;
+      payloadText = JSON.stringify(strippedPayload);
+    }
+    p.appendChild(document.createTextNode(payloadText));
+  }
+
+  if (options.deviceKey) {
+    p.dataset.logDevice = options.deviceKey;
+  }
+
+  element.appendChild(p);
+  applyDeviceFilterToEntry(p);
+
   if(autoScroll == true) {
-    var elem= document.getElementById('logs');
-    elem.scroll(0, 0);
+    scrollLogToBottom();
   }
 }
 
@@ -168,7 +330,9 @@ function checkJsonType(msg) {
           }
         }
 
-        notifyUiWhenJsonReceived(msg.data, msgDrone);
+        var logOptions = buildLogOptions(djangoData);
+        logOptions.fields = buildTelemetryFields(djangoData);
+        notifyUiWhenJsonReceived(msg.data, msgDrone, logOptions);
         // Insert/Update the marker on Google Maps, with it's location
         try {
           gmap.newMarker(id, lat, lng, status, deviceType);
@@ -189,12 +353,12 @@ function checkJsonType(msg) {
           selectScriptElement.add(opt);
         });
 
-        notifyUiWhenJsonReceived(msg.data, msgDrone);
+        notifyUiWhenJsonReceived(msg.data, msgDrone, buildLogOptions(djangoData));
         break;
       // The default behavior to other types not included above
       default:
         msgDefault = djangoData.hasOwnProperty('device') ? msgDrone : msgDefault;
-        notifyUiWhenJsonReceived(msg.data, msgDefault);
+        notifyUiWhenJsonReceived(msg.data, msgDefault, buildLogOptions(djangoData));
         break;
     }
   } catch(e) {
@@ -211,6 +375,33 @@ function checkScroll(checkbox) {
     autoScroll = false;
   }
 }
+
+// Log filter toolbar
+//-------------------
+document.getElementById('log-filter-toggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  logFilterMenuOpen = !logFilterMenuOpen;
+  document.getElementById('log-filter-menu').hidden = !logFilterMenuOpen;
+  document.getElementById('log-filter-toggle').setAttribute('aria-expanded', logFilterMenuOpen);
+});
+
+document.getElementById('log-filter-menu').addEventListener('click', function(e) {
+  e.stopPropagation();
+});
+
+document.addEventListener('click', function() {
+  if (!logFilterMenuOpen) return;
+  logFilterMenuOpen = false;
+  document.getElementById('log-filter-menu').hidden = true;
+  document.getElementById('log-filter-toggle').setAttribute('aria-expanded', false);
+});
+
+document.getElementById('log-filter-all').addEventListener('change', function(e) {
+  var checked = e.target.checked;
+  Object.keys(deviceFilterState).forEach((key) => deviceFilterState[key] = checked);
+  document.querySelectorAll('#log-filter-devices input[type="checkbox"]').forEach((input) => input.checked = checked);
+  applyDeviceFilterToAllEntries();
+});
 
 function checkLand(checkbox) {
   if(checkbox.checked) {
