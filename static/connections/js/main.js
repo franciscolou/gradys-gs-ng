@@ -182,13 +182,16 @@ function notifyUiWhenJsonSent(text) {
 
 function notifyUiWhenJsonReceived(jsonReceived, msg="", djangoData=null) {
   var deviceKey = resolveDeviceKey(djangoData);
+  // Matches exactly what this used to render pre-styling - see log.css .log-stream--raw and
+  // the rawText handling in log-stream.js.
+  var rawText = msg + jsonReceived;
   var p;
 
   if (djangoData && djangoData['type'] === 102) {
-    p = mainLogStream.addTelemetryEntry(djangoData, deviceKey, msg);
+    p = mainLogStream.addTelemetryEntry(djangoData, deviceKey, msg, rawText);
   } else {
     var payloadText = djangoData ? formatPayloadForDisplay(djangoData) : jsonReceived;
-    p = mainLogStream.addGenericEntry(deviceKey, deviceKey ? undefined : msg, payloadText);
+    p = mainLogStream.addGenericEntry(deviceKey, deviceKey ? undefined : msg, payloadText, rawText);
   }
 
   applyDeviceFilterToEntry(p);
@@ -278,6 +281,12 @@ document.getElementById('log-collapse-toggle').addEventListener('click', functio
   var next = this.getAttribute('aria-pressed') !== 'true';
   this.setAttribute('aria-pressed', String(next));
   mainLogStream.setCollapse(next);
+});
+
+document.getElementById('log-raw-toggle').addEventListener('click', function() {
+  var next = this.getAttribute('aria-pressed') !== 'true';
+  this.setAttribute('aria-pressed', String(next));
+  mainLogStream.setRawMode(next);
 });
 
 document.getElementById('log-grid-window-toggle').addEventListener('click', function() {

@@ -7,11 +7,12 @@ var deviceFilterState = {};
 var logFilterMenuOpen = false;
 var globalCollapse = true;
 var globalAutoScroll = true;
+var globalRawMode = false;
 
 // Fixed section (not a per-device cell) for commands the main ground station window sends -
 // see main.js sendCommand(). It never collapses: unlike telemetry, sent commands aren't a
 // repeating stream, so there's nothing meaningful to fold into a run.
-var commandsSentStream = createLogStream(document.getElementById('commands-sent-stream'), {autoScroll: globalAutoScroll, collapse: false});
+var commandsSentStream = createLogStream(document.getElementById('commands-sent-stream'), {autoScroll: globalAutoScroll, collapse: false, rawMode: globalRawMode});
 
 function hideEmptyState() {
   var empty = document.getElementById('logs-grid-empty');
@@ -49,7 +50,7 @@ function ensureDeviceCell(deviceKey) {
   cell.appendChild(streamEl);
   document.getElementById('logs-grid').appendChild(cell);
 
-  var stream = createLogStream(streamEl, {autoScroll: globalAutoScroll, collapse: globalCollapse});
+  var stream = createLogStream(streamEl, {autoScroll: globalAutoScroll, collapse: globalCollapse, rawMode: globalRawMode});
 
   localCollapseToggle.addEventListener('click', function() {
     var next = localCollapseToggle.getAttribute('aria-pressed') !== 'true';
@@ -151,6 +152,13 @@ document.getElementById('log-collapse-toggle').addEventListener('click', functio
     entry.stream.setCollapse(globalCollapse);
     entry.localCollapseToggle.setAttribute('aria-pressed', String(globalCollapse));
   });
+});
+
+document.getElementById('log-raw-toggle').addEventListener('click', function() {
+  globalRawMode = this.getAttribute('aria-pressed') !== 'true';
+  this.setAttribute('aria-pressed', String(globalRawMode));
+  commandsSentStream.setRawMode(globalRawMode);
+  Object.values(deviceCells).forEach((entry) => entry.stream.setRawMode(globalRawMode));
 });
 
 document.getElementById('log-filter-toggle').addEventListener('click', function(e) {

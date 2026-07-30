@@ -146,7 +146,24 @@
   row-gap: 4px;
 }
 
-.log-entry-structured::before {
+/* The plain-text pre-styling equivalent of a structured/badge entry - see .log-view-raw below
+   and createLogStream's rawText handling in log-stream.js. Hidden unless raw mode is on. */
+.log-view-raw {
+  display: none;
+  white-space: pre-wrap;
+}
+
+.log-stream--raw .log-view-styled {
+  display: none;
+}
+
+.log-stream--raw .log-view-raw {
+  display: inline;
+}
+
+/* The device/receiver badge makes the '< '/'> ' direction marker redundant, so styled mode hides
+   it for structured entries - but raw mode has no badge, so the marker should show there instead */
+.log-stream:not(.log-stream--raw) p:has(> .log-view-styled.log-entry-structured)::before {
   content: none;
 }
 

@@ -160,6 +160,8 @@ function createLogStream(container, options = {}) {
   var nextRank = 0;
   var PIN_ORDER_BASE = -1000000;
 
+  container.classList.toggle('log-stream--raw', !!options.rawMode);
+
   function getDeviceRank(deviceKey) {
     if (!deviceRank.hasOwnProperty(deviceKey)) {
       deviceRank[deviceKey] = nextRank++;
@@ -171,39 +173,54 @@ function createLogStream(container, options = {}) {
     container.scrollTop = container.scrollHeight;
   }
 
-  function renderEntry({deviceKey, seq, prefixText, fields, payloadText}) {
+  // Every entry that can be shown "structured" (badges/fields) also carries a plain-text
+  // .log-view-raw counterpart, matching how logs looked before that styling was added (see
+  // log.css .log-stream--raw) - so the raw toggle is just hiding/showing one or the other,
+  // never re-rendering.
+  function renderEntry({deviceKey, seq, prefixText, fields, payloadText, rawText}) {
     var p = document.createElement('p');
     p.className = 'json-received';
+
+    var styled = document.createElement('span');
+    styled.className = 'log-view-styled';
 
     if (deviceKey) {
       var badge = document.createElement('span');
       badge.className = 'log-device-badge';
       badge.textContent = deviceKey;
-      p.appendChild(badge);
+      styled.appendChild(badge);
       p.dataset.logDevice = deviceKey;
     } else if (prefixText) {
-      p.appendChild(document.createTextNode(prefixText));
+      styled.appendChild(document.createTextNode(prefixText));
     }
 
     if (seq !== undefined) {
       var seqBadge = document.createElement('span');
       seqBadge.className = 'log-seq';
       seqBadge.textContent = '#' + seq;
-      p.appendChild(seqBadge);
+      styled.appendChild(seqBadge);
     }
 
     if (fields) {
-      p.classList.add('log-entry-structured');
-      fields.forEach((field) => appendLogField(p, field));
+      styled.classList.add('log-entry-structured');
+      fields.forEach((field) => appendLogField(styled, field));
     } else if (payloadText !== undefined) {
-      p.appendChild(document.createTextNode(payloadText));
+      styled.appendChild(document.createTextNode(payloadText));
     }
+
+    p.appendChild(styled);
+
+    var raw = document.createElement('span');
+    raw.className = 'log-view-raw';
+    raw.appendChild(document.createTextNode(rawText !== undefined ? rawText : (prefixText || '') + (payloadText !== undefined ? payloadText : '')));
+    p.appendChild(raw);
 
     container.appendChild(p);
     return p;
   }
 
   function addSentEntry(text) {
+    // Free-form notices (e.g. "File uploaded sent!") - identical in both views, so no dual markup.
     var p = document.createElement('p');
     p.className = 'json-sent';
     p.appendChild(document.createTextNode(text));
@@ -217,24 +234,39 @@ function createLogStream(container, options = {}) {
     // The badge shows the receiver (target device id, or 'all' for a broadcast) - the sent-side
     // equivalent of the device badge shown on received entries.
     var p = document.createElement('p');
-    p.className = 'json-sent log-entry-structured';
+    p.className = 'json-sent';
+
+    var styled = document.createElement('span');
+    styled.className = 'log-view-styled log-entry-structured';
 
     var badge = document.createElement('span');
     badge.className = 'log-receiver-badge';
     badge.textContent = String(commandData.receiver).toUpperCase();
-    p.appendChild(badge);
+    styled.appendChild(badge);
 
-    buildCommandSentFields(commandData).forEach((field) => appendLogField(p, field));
+    buildCommandSentFields(commandData).forEach((field) => appendLogField(styled, field));
+    p.appendChild(styled);
+
+    var raw = document.createElement('span');
+    raw.className = 'log-view-raw';
+    raw.appendChild(document.createTextNode('Command sent: ' + JSON.stringify(commandData)));
+    p.appendChild(raw);
 
     container.appendChild(p);
     if (autoScroll) scrollToBottom();
     return p;
   }
 
-  function addTelemetryEntry(djangoData, deviceKey, prefixText) {
+  function addTelemetryEntry(djangoData, deviceKey, prefixText, rawText) {
     var fields = buildTelemetryFields(djangoData);
     var signature = buildTelemetrySignature(djangoData);
-    var p = renderEntry({deviceKey: deviceKey, seq: djangoData['seq'], prefixText: prefixText, fields: fields});
+    var p = renderEntry({
+      deviceKey: deviceKey,
+      seq: djangoData['seq'],
+      prefixText: prefixText,
+      fields: fields,
+      rawText: rawText !== undefined ? rawText : JSON.stringify(djangoData),
+    });
     p.dataset.logSignature = signature;
 
     // Rank is tracked from the first message ever seen for this device, regardless of whether
@@ -256,8 +288,13 @@ function createLogStream(container, options = {}) {
     return p;
   }
 
-  function addGenericEntry(deviceKey, prefixText, payloadText) {
-    var p = renderEntry({deviceKey: deviceKey, prefixText: prefixText, payloadText: payloadText});
+  function addGenericEntry(deviceKey, prefixText, payloadText, rawText) {
+    var p = renderEntry({
+      deviceKey: deviceKey,
+      prefixText: prefixText,
+      payloadText: payloadText,
+      rawText: rawText !== undefined ? rawText : (prefixText || '') + (payloadText !== undefined ? payloadText : ''),
+    });
     if (autoScroll) scrollToBottom();
     return p;
   }
@@ -311,6 +348,10 @@ function createLogStream(container, options = {}) {
     if (autoScroll) scrollToBottom();
   }
 
+  function setRawMode(value) {
+    container.classList.toggle('log-stream--raw', !!value);
+  }
+
   return {
     addTelemetryEntry,
     addGenericEntry,
@@ -318,6 +359,7 @@ function createLogStream(container, options = {}) {
     addCommandSentEntry,
     setCollapse,
     setAutoScroll,
+    setRawMode,
     scrollToBottom,
   };
 }
