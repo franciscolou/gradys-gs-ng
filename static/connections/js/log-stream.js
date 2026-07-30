@@ -148,19 +148,45 @@ function createLogStream(container, options = {}) {
   // collapsed ones are just hidden (log-entry-collapsed), so toggling is always reversible and
   // retroactive over everything already shown, not just messages that arrive after the toggle.
   //
-  // While collapsed, a device's visible entries also get a fixed rank (via the CSS `order`
-  // property on the flex container) based on the order devices were first seen - so a device's
-  // line always sorts to the same place instead of fighting every other device for the bottom
-  // slot just because messages arrive interleaved. This rank is cleared again once uncollapsed,
-  // restoring plain chronological order.
+  // While collapsed, every device keeps a fixed rank (via the CSS `order` property) based on the
+  // order devices were first seen, so two devices' visible lines never swap places just because
+  // one of them happens to update more often - order stays (segment, rank), never plain arrival
+  // time. "segment" is a shared counter that advances on every interruption (see breakRun below),
+  // whether it's tied to one specific device or not - so even a device with nothing interrupting
+  // it directly still gets bumped into the next segment once anything elsewhere does, instead of
+  // silently stretching its current position far past where the rest of the log has already
+  // moved on to. An interruption with no single device to attribute it to (a broadcast command, a
+  // free-form notice) additionally gets the current segment's last slot, so it renders once,
+  // after every device's entries for that segment and before any device's entries for the next -
+  // a single shared divider ("everyone's readings before" / the entry / "everyone's readings
+  // after") instead of nesting into just one device's slot or detaching from all of them.
   var autoScroll = options.autoScroll !== false;
   var collapse = !!options.collapse;
   var runTracker = {}; // deviceKey -> {signature, lastEntry}
   var deviceRank = {}; // deviceKey -> integer, assigned the first time a device is seen
   var nextRank = 0;
-  var PIN_ORDER_BASE = -1000000;
+  var segment = 0;
+  var SEGMENT_SIZE = 1000; // headroom for devices-per-segment; only the relative order matters
 
-  container.classList.toggle('log-stream--raw', !!options.rawMode);
+  // Called for every entry that isn't itself a telemetry reading, so a repeated telemetry
+  // signature that resumes afterwards starts a fresh collapsed run instead of silently
+  // continuing the one that was in progress before this entry showed up. When the entry is
+  // tied to a specific device (e.g. a non-telemetry message from that device) only that
+  // device's collapsing resets; when it isn't (e.g. a sent command targeting 'all' devices, or
+  // a free-form notice), every device's does. Either way the segment always advances (see
+  // pinOrder below) - ANY interruption, even one that only concerns a single device, is a
+  // synchronization point for every device's ordering, not just the one it happened to concern.
+  // Without that, a device with no interruptions of its own could keep silently extending its
+  // current run's position far past a point where another device has already moved on, which
+  // reads as if it were still "back there" instead of showing what's actually going on right now.
+  function breakRun(deviceKey) {
+    if (deviceKey) {
+      delete runTracker[deviceKey];
+    } else {
+      runTracker = {};
+    }
+    segment++;
+  }
 
   function getDeviceRank(deviceKey) {
     if (!deviceRank.hasOwnProperty(deviceKey)) {
@@ -168,6 +194,19 @@ function createLogStream(container, options = {}) {
     }
     return deviceRank[deviceKey];
   }
+
+  // See the class comment above for what "segment" means. Must be called before breakRun() for
+  // the same entry, so a global-break entry itself still gets the outgoing segment's last slot.
+  function pinOrder(deviceKey, p) {
+    if (!collapse) return;
+    p.style.order = deviceKey
+      ? String(segment * SEGMENT_SIZE + getDeviceRank(deviceKey))
+      : String(segment * SEGMENT_SIZE + SEGMENT_SIZE - 1);
+  }
+
+  var deviceKeysByRawId = {}; // raw telemetry 'id' (as seen in a sent command's 'receiver') -> deviceKey
+
+  container.classList.toggle('log-stream--raw', !!options.rawMode);
 
   function scrollToBottom() {
     container.scrollTop = container.scrollHeight;
@@ -225,6 +264,8 @@ function createLogStream(container, options = {}) {
     p.className = 'json-sent';
     p.appendChild(document.createTextNode(text));
     container.appendChild(p);
+    pinOrder(undefined, p);
+    breakRun();
     if (autoScroll) scrollToBottom();
     return p;
   }
@@ -253,6 +294,15 @@ function createLogStream(container, options = {}) {
     p.appendChild(raw);
 
     container.appendChild(p);
+
+    // A command aimed at one specific (already-seen) device only breaks that device's run;
+    // a broadcast ('all') or an unrecognized receiver has no single device to attribute it to,
+    // so it breaks every run in progress instead.
+    var targetDeviceKey = deviceKeysByRawId[String(commandData.receiver)];
+    if (targetDeviceKey) p.dataset.logDevice = targetDeviceKey;
+    pinOrder(targetDeviceKey, p);
+    breakRun(targetDeviceKey);
+
     if (autoScroll) scrollToBottom();
     return p;
   }
@@ -268,13 +318,8 @@ function createLogStream(container, options = {}) {
       rawText: rawText !== undefined ? rawText : JSON.stringify(djangoData),
     });
     p.dataset.logSignature = signature;
-
-    // Rank is tracked from the first message ever seen for this device, regardless of whether
-    // collapse is on right now, so toggling collapse on later still pins devices in arrival order
-    var rank = getDeviceRank(deviceKey);
-    if (collapse) {
-      p.style.order = String(PIN_ORDER_BASE + rank);
-    }
+    deviceKeysByRawId[String(djangoData['id'])] = deviceKey;
+    pinOrder(deviceKey, p);
 
     var run = runTracker[deviceKey];
     if (run && run.signature === signature) {
@@ -295,43 +340,52 @@ function createLogStream(container, options = {}) {
       payloadText: payloadText,
       rawText: rawText !== undefined ? rawText : (prefixText || '') + (payloadText !== undefined ? payloadText : ''),
     });
+
+    pinOrder(deviceKey, p);
+    breakRun(deviceKey);
+
     if (autoScroll) scrollToBottom();
     return p;
   }
 
   function recomputeCollapsedRuns() {
-    // Re-derive every run from scratch, per device, in chronological (DOM) order. Scanning in
-    // DOM order also means the first key added to `byDevice` for each device is that device's
-    // earliest entry, so deriving ranks here (via getDeviceRank) backfills first-seen order
-    // correctly even if collapse is being turned on for the very first time.
-    var byDevice = {};
-    container.querySelectorAll('p[data-log-device][data-log-signature]').forEach((p) => {
-      var key = p.dataset.logDevice;
-      (byDevice[key] = byDevice[key] || []).push(p);
-    });
+    // Re-derive every run (and every device's rank-based order, and the segment counter) from
+    // scratch by replaying the whole container in chronological (DOM) order through the same
+    // rules addTelemetryEntry/breakRun apply live - so re-enabling collapse can't "heal" a run
+    // split that an interrupting entry already caused live, and a fresh page load (which never
+    // calls the live path at all) still ends up in the same state.
+    var localTracker = {};
+    segment = 0;
+    Array.prototype.forEach.call(container.children, (p) => {
+      var deviceKey = p.dataset.logDevice;
+      var signature = p.dataset.logSignature;
 
-    Object.keys(byDevice).forEach((deviceKey) => {
-      var entries = byDevice[deviceKey];
-      var rank = getDeviceRank(deviceKey);
-      var pinnedOrder = String(PIN_ORDER_BASE + rank);
+      pinOrder(deviceKey, p);
 
-      var runStart = 0;
-      for (var i = 1; i <= entries.length; i++) {
-        var sameAsPrev = i < entries.length && entries[i].dataset.logSignature === entries[runStart].dataset.logSignature;
-        if (!sameAsPrev) {
-          for (var j = runStart; j < i - 1; j++) entries[j].classList.add('log-entry-collapsed');
-          entries[i - 1].classList.remove('log-entry-collapsed');
-          runStart = i;
+      if (deviceKey && signature !== undefined) {
+        var run = localTracker[deviceKey];
+        if (run && run.signature === signature) {
+          run.lastEntry.classList.add('log-entry-collapsed');
+          run.lastEntry = p;
+        } else {
+          localTracker[deviceKey] = {signature: signature, lastEntry: p};
         }
+        p.classList.remove('log-entry-collapsed');
+      } else {
+        if (deviceKey) {
+          delete localTracker[deviceKey];
+        } else {
+          localTracker = {};
+        }
+        segment++;
+        p.classList.remove('log-entry-collapsed');
       }
-
-      entries.forEach((p) => { p.style.order = pinnedOrder; });
     });
   }
 
   function expandAllEntries() {
     container.querySelectorAll('.log-entry-collapsed').forEach((p) => p.classList.remove('log-entry-collapsed'));
-    container.querySelectorAll('p[data-log-device]').forEach((p) => { p.style.order = ''; });
+    Array.prototype.forEach.call(container.children, (p) => { p.style.order = ''; });
   }
 
   function setCollapse(value) {

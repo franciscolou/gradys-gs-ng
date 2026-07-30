@@ -101,8 +101,9 @@
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 10px;
-  /* display:flex + order lets a device's entry keep a fixed rank while collapse is active,
-     without moving it in the DOM or duplicating it anywhere - see log-stream.js */
+  /* display:flex + order lets each device keep a fixed rank while collapse is active, so two
+     devices' visible lines never swap places just from one updating more often than the other -
+     without moving anything in the DOM or duplicating it anywhere - see log-stream.js */
   display: flex;
   flex-direction: column;
 }
