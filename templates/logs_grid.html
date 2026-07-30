@@ -11,14 +11,14 @@
 <body>
   <div class="grid-page">
     <div class="log-toolbar grid-toolbar">
-      <span class="grid-toolbar-title section-heading">Logs by device</span>
+      <span class="grid-toolbar-title section-heading">Log Mosaic</span>
       <button type="button" class="log-toolbar-toggle" id="log-autoscroll-toggle" aria-pressed="true" title="Auto-scroll every cell to its newest entry">
         <span class="material-symbols-outlined">vertical_align_bottom</span>
       </button>
       <button type="button" class="log-toolbar-toggle" id="log-collapse-toggle" aria-pressed="true" title="Collapse repeated entries in every cell">
         <span class="material-symbols-outlined">unfold_less</span>
       </button>
-      <button type="button" class="log-toolbar-toggle" id="log-raw-toggle" aria-pressed="false" title="Show raw log text (pre-styling format) in every cell">
+      <button type="button" class="log-toolbar-toggle" id="log-raw-toggle" aria-pressed="false" title="Show raw log content">
         <span class="material-symbols-outlined">data_object</span>
       </button>
       <div class="log-filter" id="log-filter">
@@ -41,6 +41,7 @@
       </div>
       <div class="log-stream grid-cell-stream" id="commands-sent-stream"></div>
     </div>
+    <div class="row-resizer" id="commands-row-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize Ground station commands section"></div>
 
     <div class="logs-grid" id="logs-grid">
       <p class="logs-grid-empty" id="logs-grid-empty">Waiting for telemetry... keep the main ground station window open, it's the source of this data.</p>
@@ -49,5 +50,6 @@
 
   <script src="{% static 'connections/js/log-stream.js' %}"></script>
   <script src="{% static 'connections/js/logs-grid.js' %}"></script>
+  <script src="{% static 'connections/js/mosaic-resizer.js' %}" defer></script>
 </body>
 </html>

@@ -25,7 +25,14 @@
 }
 
 .command-buttons {
-  overflow-y: scroll;
+  /* horizontal scroll is never legitimate here - everything inside is capped to the column's
+     width (max-width: 100%) - so it's hidden outright rather than left on "auto". Leaving
+     overflow-x as the default "visible" would otherwise get it silently recomputed to "auto"
+     by the spec (a non-"visible" overflow-y forces the other axis out of "visible" too), surfacing
+     a horizontal scrollbar from mere sub-pixel layout rounding. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
   grid-area: btns;
   display: flex;
   flex-direction: column;
