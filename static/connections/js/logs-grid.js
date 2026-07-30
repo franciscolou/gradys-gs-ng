@@ -382,7 +382,7 @@ function handleIncomingMessage(djangoData) {
 
   var deviceKey = `${djangoData['device'].toUpperCase()}-${djangoData['id']}`;
   var entry = ensureDeviceCell(deviceKey);
-  entry.stream.addTelemetryEntry(djangoData, undefined, undefined);
+  entry.stream.addTelemetryEntry(djangoData, deviceKey, undefined);
 }
 
 function isSentCommand(data) {
