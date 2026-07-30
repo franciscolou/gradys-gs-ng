@@ -2,24 +2,52 @@
 // Used by both the main ground station UI (main.js) and the standalone per-device
 // logs grid window (logs-grid.js), so both views stay visually and behaviorally consistent.
 
-// Textual de-para for the numeric 'type' field, mirroring connections/command_types.py CommandType
+// Numeric 'type' codes exchanged with the devices, mirroring connections/command_types.py CommandType
+const CommandType = Object.freeze({
+  SERIAL_HANDSHAKE: 13,
+  SERIAL_CONNECTED: 14,
+  GPS_POSITION: 20,
+  NED_POSITION: 22,
+  ARM: 24,
+  TAKEOFF: 26,
+  LAND: 28,
+  LAND_STOP: 29,
+  RTL: 30,
+  RTL_STOP: 31,
+  LIST_SCRIPTS: 42,
+  UPLOAD_SCRIPT: 44,
+  EXECUTE_SCRIPT: 46,
+  ACK_ERROR: 101,
+  POSITION_INFO: 102,
+  ACK_SUCCESS: 103,
+});
+
+// The 'button_type' a sent command can carry - controls how PostConsumer.send_via_http handles it
+// (see connections/consumers_wrapper/post_consumers.py): 'default' is a single POST, 'checkbox'
+// starts/stops a repeating send loop, 'upload' sends 'data' as multipart form data.
+const ButtonType = Object.freeze({
+  DEFAULT: 'default',
+  CHECKBOX: 'checkbox',
+  UPLOAD: 'upload',
+});
+
 const COMMAND_TYPE_LABELS = {
-  13: 'Serial Handshake',
-  14: 'Serial Connected',
-  20: 'GPS Position',
-  22: 'NED Position',
-  24: 'Arm',
-  26: 'Takeoff',
-  28: 'Land',
-  29: 'Land Stop',
-  30: 'RTL',
-  31: 'RTL Stop',
-  42: 'List Scripts',
-  44: 'Upload Script',
-  46: 'Execute Script',
-  101: 'Ack Error',
-  102: 'Position Info',
-  103: 'Ack Success',
+  [CommandType.SERIAL_HANDSHAKE]: 'Serial Handshake',
+  [CommandType.SERIAL_CONNECTED]: 'Serial Connected',
+  [CommandType.GPS_POSITION]: 'GPS Position',
+  [CommandType.NED_POSITION]: 'NED Position',
+  [CommandType.ARM]: 'Arm',
+  [CommandType.TAKEOFF]: 'Takeoff',
+  [CommandType.LAND]: 'Land',
+  [CommandType.LAND_STOP]: 'Land Stop',
+  [CommandType.RTL]: 'RTL',
+  [CommandType.RTL_STOP]: 'RTL Stop',
+  [CommandType.LIST_SCRIPTS]: 'List Scripts',
+  [CommandType.UPLOAD_SCRIPT]: 'Upload Script',
+  [CommandType.EXECUTE_SCRIPT]: 'Execute Script',
+  [CommandType.ACK_ERROR]: 'Ack Error',
+  [CommandType.POSITION_INFO]: 'Position Info',
+  [CommandType.ACK_SUCCESS]: 'Ack Success',
 };
 
 function formatCommandType(type) {
@@ -71,6 +99,25 @@ function buildTelemetrySignature(djangoData) {
   return [status, djangoData['device'], djangoData['id'], djangoData['ip'], djangoData['method']].join('|');
 }
 
+function buildCommandSentFields(commandData) {
+  // Turns a sent command (see main.js sendCommand) into labeled fields instead of a raw JSON blob.
+  // 'data' is free-form and can hold an unbounded number of keys, so its value is never printed
+  // inline - it's only readable through the instant hover tooltip (see .log-field--hoverable in log.css).
+  var buttonType = commandData.button_type || ButtonType.DEFAULT;
+
+  return [
+    {value: formatCommandType(commandData.type), className: 'log-command-name'},
+    {label: 'mode', value: buttonType, className: `log-button-type log-button-type--${buttonType}`},
+    {
+      label: 'data',
+      value: '{…}',
+      className: 'log-field--data',
+      hoverText: JSON.stringify(commandData.data || {}, null, 2),
+    },
+    {label: 'gs', value: commandData.id, className: 'log-meta'},
+  ];
+}
+
 function appendLogField(parent, field) {
   var fieldSpan = document.createElement('span');
   fieldSpan.className = `log-field ${field.className || ''}`;
@@ -86,6 +133,11 @@ function appendLogField(parent, field) {
   valueSpan.className = 'log-field-value';
   valueSpan.textContent = field.value;
   fieldSpan.appendChild(valueSpan);
+
+  if (field.hoverText !== undefined) {
+    fieldSpan.classList.add('log-field--hoverable');
+    fieldSpan.dataset.tooltip = field.hoverText;
+  }
 
   parent.appendChild(fieldSpan);
 }
@@ -155,6 +207,25 @@ function createLogStream(container, options = {}) {
     var p = document.createElement('p');
     p.className = 'json-sent';
     p.appendChild(document.createTextNode(text));
+    container.appendChild(p);
+    if (autoScroll) scrollToBottom();
+    return p;
+  }
+
+  function addCommandSentEntry(commandData) {
+    // Structured counterpart to addTelemetryEntry, for the command this ground station just sent.
+    // The badge shows the receiver (target device id, or 'all' for a broadcast) - the sent-side
+    // equivalent of the device badge shown on received entries.
+    var p = document.createElement('p');
+    p.className = 'json-sent log-entry-structured';
+
+    var badge = document.createElement('span');
+    badge.className = 'log-receiver-badge';
+    badge.textContent = String(commandData.receiver).toUpperCase();
+    p.appendChild(badge);
+
+    buildCommandSentFields(commandData).forEach((field) => appendLogField(p, field));
+
     container.appendChild(p);
     if (autoScroll) scrollToBottom();
     return p;
@@ -244,8 +315,73 @@ function createLogStream(container, options = {}) {
     addTelemetryEntry,
     addGenericEntry,
     addSentEntry,
+    addCommandSentEntry,
     setCollapse,
     setAutoScroll,
     scrollToBottom,
   };
 }
+
+// Shared hover tooltip for every .log-field--hoverable field (currently just the 'data' field on
+// sent commands), one per document. A CSS-only ::after tooltip would get clipped by the grid
+// cells' `overflow-y: auto` (see .grid-cell-stream in logs_grid.css) and could run under
+// neighbouring cells. Rendering a single position:fixed element on <body> instead escapes that
+// clipping and any stacking-context ordering, and lets JS flip/clamp it against the real
+// viewport - above the field by default, below if there isn't room, and never past either edge.
+(function setupHoverTooltip() {
+  var EDGE_MARGIN = 8; // gap kept both from the hovered field and from the viewport edges
+  var tooltip = null;
+
+  function getTooltip() {
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'log-hover-tooltip';
+      document.body.appendChild(tooltip);
+    }
+    return tooltip;
+  }
+
+  function positionTooltip(el, field) {
+    var fieldRect = field.getBoundingClientRect();
+    var tipRect = el.getBoundingClientRect(); // visibility:hidden still lays out and is measurable
+
+    var top = fieldRect.top - tipRect.height - EDGE_MARGIN;
+    if (top < EDGE_MARGIN) {
+      // Not enough room above - flip below, then clamp so a very tall payload still fits on screen
+      top = Math.min(fieldRect.bottom + EDGE_MARGIN, window.innerHeight - tipRect.height - EDGE_MARGIN);
+      top = Math.max(EDGE_MARGIN, top);
+    }
+
+    var left = Math.min(fieldRect.left, window.innerWidth - tipRect.width - EDGE_MARGIN);
+    left = Math.max(EDGE_MARGIN, left);
+
+    el.style.top = `${top}px`;
+    el.style.left = `${left}px`;
+  }
+
+  function showTooltip(field) {
+    var el = getTooltip();
+    el.textContent = field.dataset.tooltip;
+    positionTooltip(el, field);
+    el.classList.add('log-hover-tooltip--visible');
+  }
+
+  function hideTooltip() {
+    if (tooltip) tooltip.classList.remove('log-hover-tooltip--visible');
+  }
+
+  document.addEventListener('mouseover', function(e) {
+    var field = e.target.closest && e.target.closest('.log-field--hoverable');
+    if (field) showTooltip(field);
+  });
+
+  document.addEventListener('mouseout', function(e) {
+    var field = e.target.closest && e.target.closest('.log-field--hoverable');
+    if (field && !field.contains(e.relatedTarget)) hideTooltip();
+  });
+
+  // A stream's own scrolling (or a device cell scrolling into/out of collapse) can leave the
+  // tooltip pointing at a field position that's no longer accurate - just hide it rather than
+  // tracking the field live.
+  document.addEventListener('scroll', hideTooltip, true);
+})();

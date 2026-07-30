@@ -162,6 +162,82 @@
   background-color: var(--color-accent-dim);
 }
 
+/* Outlined (vs. .log-device-badge's filled look) to read as "target" rather than "source" */
+.log-receiver-badge {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 5px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  background-color: transparent;
+  border: 1px solid var(--color-accent-dim);
+}
+
+.log-command-name .log-field-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  text-transform: uppercase;
+}
+
+.log-button-type .log-field-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.log-button-type--default .log-field-value {
+  color: var(--color-text-muted);
+}
+
+.log-button-type--checkbox .log-field-value {
+  color: var(--color-warning);
+}
+
+.log-button-type--upload .log-field-value {
+  color: var(--color-accent);
+}
+
+/* 'data' can hold an unbounded number of keys, so it's never printed inline - only this instant
+   hover (no transition delay) reveals the raw JSON, via the .log-hover-tooltip element below */
+.log-field--hoverable {
+  cursor: help;
+  border-bottom: 1px dashed var(--color-text-muted);
+}
+
+/* Positioned by JS (setupHoverTooltip in log-stream.js), not CSS: it needs the field's real
+   viewport position to flip above/below and clamp horizontally, which attr()/::after can't do.
+   position:fixed + living on <body> also escapes the grid cells' `overflow-y: auto` (see
+   .grid-cell-stream in logs_grid.css), so it's never clipped or covered by a neighbouring cell. */
+.log-hover-tooltip {
+  position: fixed;
+  z-index: 1000;
+  visibility: hidden;
+  max-width: 360px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--color-panel);
+  border: 2px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.log-hover-tooltip--visible {
+  visibility: visible;
+}
+
 .log-field {
   display: inline-flex;
   align-items: baseline;

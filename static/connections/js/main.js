@@ -37,28 +37,28 @@ receivePostSocket.addEventListener('open', function (event) {
 });
 
 
-function sendCommand(cmdNumber, buttonType="default", data={}) {
+function sendCommand(cmdNumber, buttonType=ButtonType.DEFAULT, data={}) {
   // Send the selected command to a set of devices, obtained from getDeviceReceive()
   //
   // Format of command-json that will be sent:
   // id - (int) id of the groundstation
-  // cmdNumber - (int) integer that represent what this command will do (see table of commands)
-  // buttonType - (string) default or checkbox
+  // cmdNumber - (CommandType) integer that represent what this command will do
+  // buttonType - (ButtonType) default, checkbox or upload
   // receiver - (int) ID of the active device on the 'select-device list'
   //            note if the command will be sent to all devices, the ID will be 'all'
-  jsonToSend = {id: 1, type: cmdNumber, button_type: buttonType, data: data}
-  jsonToSend["receiver"] = getDeviceReceiver();
+  var commandObject = {id: 1, type: cmdNumber, button_type: buttonType, data: data};
+  commandObject["receiver"] = getDeviceReceiver();
 
-  // The wire format keeps the numeric type (that's the protocol), only the UI log gets the text label
-  var jsonForDisplay = JSON.stringify(Object.assign({}, jsonToSend, {type: formatCommandType(cmdNumber)}));
-  jsonToSend = JSON.stringify(jsonToSend);
+  var jsonToSend = JSON.stringify(commandObject);
   console.log(jsonToSend);
 
   // Send the command to the Consumers.
   // The PostConsumer will receive the command and handle it
   if (receivePostSocket.readyState == WebSocket.OPEN) {
     receivePostSocket.send(jsonToSend);
-    notifyUiWhenJsonSent(jsonForDisplay);
+    mainLogStream.addCommandSentEntry(commandObject);
+    // Forward to the standalone Log Mosaic window's "Commands sent" section, if it's open
+    if (gsLogsChannel) gsLogsChannel.postMessage(commandObject);
   }
 
   // The ReceiveCommandConsumer will receive the command and handle it
@@ -176,8 +176,8 @@ function resolveDeviceKey(djangoData) {
   return deviceKey;
 }
 
-function notifyUiWhenJsonSent(jsonSent, message="Command sent: ") {
-  mainLogStream.addSentEntry(message + jsonSent);
+function notifyUiWhenJsonSent(text) {
+  mainLogStream.addSentEntry(text);
 }
 
 function notifyUiWhenJsonReceived(jsonReceived, msg="", djangoData=null) {
@@ -311,19 +311,19 @@ document.getElementById('log-filter-all').addEventListener('change', function(e)
 
 function checkLand(checkbox) {
   if(checkbox.checked) {
-    sendCommand(28, "checkbox");
+    sendCommand(CommandType.LAND, ButtonType.CHECKBOX);
   }
   else {
-    sendCommand(29, "checkbox");
+    sendCommand(CommandType.LAND_STOP, ButtonType.CHECKBOX);
   }
 }
 
 function checkRtl(checkbox) {
   if(checkbox.checked) {
-    sendCommand(30, "checkbox");
+    sendCommand(CommandType.RTL, ButtonType.CHECKBOX);
   }
   else {
-    sendCommand(31, "checkbox");
+    sendCommand(CommandType.RTL_STOP, ButtonType.CHECKBOX);
   }
 }
 
@@ -363,28 +363,21 @@ updateSocket.onclose = function(e) {
 
 // Onclick functions
 //-------------------
-// Table of commands:
-// 20: /telemetry/gps
-// 22: /telemetry/ned
-// 24: /command/arm
-// 26: /command/takeoff
-// 28: /command/land
-// 30: /command/rtl
-// 32: /command/takeoff
+// See CommandType (log-stream.js) for what each command number maps to.
 document.querySelector('#position-gps').onclick = function(e) {
-  sendCommand(20);
+  sendCommand(CommandType.GPS_POSITION);
 };
 
 document.querySelector('#position-ned').onclick = function(e) {
-  sendCommand(22);
+  sendCommand(CommandType.NED_POSITION);
 };
 
 document.querySelector('#arm').onclick = function(e) {
-  sendCommand(24);
+  sendCommand(CommandType.ARM);
 }
 
 document.querySelector('#takeoff').onclick = function(e) {
-  sendCommand(26);
+  sendCommand(CommandType.TAKEOFF);
 };
 
 
@@ -412,13 +405,13 @@ form.addEventListener('submit', (e) => {
           "type": "text/plain"
         };
 
-        sendCommand(44, buttonType="upload", data=fileData);
+        sendCommand(CommandType.UPLOAD_SCRIPT, ButtonType.UPLOAD, fileData);
       }
 
       reader.readAsDataURL(fileInput.files[0])
-      notifyUiWhenJsonSent("File uploaded sent!", "")
+      notifyUiWhenJsonSent("File uploaded sent!")
   } else {
-      notifyUiWhenJsonSent("No file was uploaded!", "")
+      notifyUiWhenJsonSent("No file was uploaded!")
   }
   e.preventDefault();
 });
@@ -447,11 +440,11 @@ inputBtn.addEventListener('input', () => {
 });
 
 document.querySelector('#refresh-file-list').onclick = function(e) {
-  sendCommand(42);
+  sendCommand(CommandType.LIST_SCRIPTS);
 }
 
 const script_select = document.querySelector(".select-script")
 
 document.querySelector('#execute').onclick = function(e) {
-  sendCommand(46, "default", {script_name: script_select.value});
+  sendCommand(CommandType.EXECUTE_SCRIPT, ButtonType.DEFAULT, {script_name: script_select.value});
 }

@@ -22,6 +22,12 @@ body {
   margin-right: auto;
 }
 
+/* Fixed-height section pinned above the per-device grid - not a device, so it never competes
+   with .logs-grid's auto-fill columns for space */
+.grid-commands-section {
+  flex: 0 0 220px;
+}
+
 .logs-grid {
   flex: 1 1 auto;
   min-height: 0;

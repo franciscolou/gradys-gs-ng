@@ -8,6 +8,11 @@ var logFilterMenuOpen = false;
 var globalCollapse = true;
 var globalAutoScroll = true;
 
+// Fixed section (not a per-device cell) for commands the main ground station window sends -
+// see main.js sendCommand(). It never collapses: unlike telemetry, sent commands aren't a
+// repeating stream, so there's nothing meaningful to fold into a run.
+var commandsSentStream = createLogStream(document.getElementById('commands-sent-stream'), {autoScroll: globalAutoScroll, collapse: false});
+
 function hideEmptyState() {
   var empty = document.getElementById('logs-grid-empty');
   if (empty) empty.remove();
@@ -102,7 +107,8 @@ function syncAllFilterCheckbox() {
 }
 
 function handleIncomingMessage(djangoData) {
-  // Only per-device telemetry belongs in the grid - sent commands, acks, script lists, etc. don't
+  // Only per-device telemetry belongs in the device grid - acks, script lists, etc. don't.
+  // Commands sent by this ground station are routed to commandsSentStream instead, see below.
   if (!djangoData || djangoData['type'] !== 102) return;
   if (!djangoData.hasOwnProperty('device') || !djangoData.hasOwnProperty('id')) return;
 
@@ -111,10 +117,19 @@ function handleIncomingMessage(djangoData) {
   entry.stream.addTelemetryEntry(djangoData, undefined, undefined);
 }
 
+function isSentCommand(data) {
+  // Sent commands (see main.js sendCommand) are the only broadcast messages carrying button_type
+  return !!data && data.hasOwnProperty('button_type');
+}
+
 if (typeof BroadcastChannel !== 'undefined') {
   var gsLogsChannel = new BroadcastChannel('gs-logs-stream');
   gsLogsChannel.onmessage = function(event) {
-    handleIncomingMessage(event.data);
+    if (isSentCommand(event.data)) {
+      commandsSentStream.addCommandSentEntry(event.data);
+    } else {
+      handleIncomingMessage(event.data);
+    }
   };
 } else {
   console.error('BroadcastChannel not supported in this browser - this window cannot receive live data.');
@@ -125,6 +140,7 @@ if (typeof BroadcastChannel !== 'undefined') {
 document.getElementById('log-autoscroll-toggle').addEventListener('click', function() {
   globalAutoScroll = this.getAttribute('aria-pressed') !== 'true';
   this.setAttribute('aria-pressed', String(globalAutoScroll));
+  commandsSentStream.setAutoScroll(globalAutoScroll);
   Object.values(deviceCells).forEach((entry) => entry.stream.setAutoScroll(globalAutoScroll));
 });
 
