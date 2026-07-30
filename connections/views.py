@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync
 
 from .consumers_wrapper.post_consumers import get_post_consumer_instance
 from .consumers_wrapper.update_periodically_consumer import get_device_from_list_by_id
+from .command_types import CommandType
 import configparser
 
 config = configparser.ConfigParser()
@@ -20,6 +21,13 @@ def index(request):
     'server_address': config['server']['ip_groundstation_server']
   }
   return render(request, 'index.html', context=context)
+
+
+def logs_grid(request):
+  # Standalone window (opened from the log toolbar) showing each device's log in its own grid cell.
+  # It has no websocket of its own: it receives data forwarded by the main window's socket
+  # over a BroadcastChannel, so it only works while that window/tab stays open.
+  return render(request, 'logs_grid.html')
 
 
 def create_new_dict(request_received):
@@ -57,7 +65,7 @@ async def post_to_socket(request):
   # Receives a POST request with information on it's body
   # Start ACK with an error code on type (101?).
   # If the post is sent to the consumer, the type is 103.
-  ack = {"id": 1, "type": 101, "seq": 0, "lat": 0, "lng": 0, "alt": 0, "DATA": "0"}
+  ack = {"id": 1, "type": CommandType.ACK_ERROR, "seq": 0, "lat": 0, "lng": 0, "alt": 0, "DATA": "0"}
 
   if request.method == 'POST':
     new_dict = create_new_dict(request)
@@ -65,7 +73,7 @@ async def post_to_socket(request):
     post_consumer_instance = get_post_consumer_instance()
     if post_consumer_instance is not None:
       await post_consumer_instance.receive_post(new_dict)
-      ack['type'] = 103
+      ack['type'] = CommandType.ACK_SUCCESS
 
   return JsonResponse(ack)
 

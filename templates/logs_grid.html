@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{% static 'connections/css/logs_grid.css' %}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+  <title>Ground station — Logs grid</title>
+</head>
+<body>
+  <div class="grid-page">
+    <div class="log-toolbar grid-toolbar">
+      <span class="grid-toolbar-title section-heading">Logs by device</span>
+      <button type="button" class="log-toolbar-toggle" id="log-autoscroll-toggle" aria-pressed="true" title="Auto-scroll every cell to its newest entry">
+        <span class="material-symbols-outlined">vertical_align_bottom</span>
+      </button>
+      <button type="button" class="log-toolbar-toggle" id="log-collapse-toggle" aria-pressed="true" title="Collapse repeated entries in every cell">
+        <span class="material-symbols-outlined">unfold_less</span>
+      </button>
+      <div class="log-filter" id="log-filter">
+        <button type="button" class="log-toolbar-toggle" id="log-filter-toggle" aria-haspopup="true" aria-expanded="false" title="Show/hide devices">
+          <span class="material-symbols-outlined">filter_alt</span>
+        </button>
+        <div class="log-filter-menu" id="log-filter-menu" hidden>
+          <label class="log-filter-option">
+            <input type="checkbox" id="log-filter-all" checked>
+            <span>All devices</span>
+          </label>
+          <div class="log-filter-divider" id="log-filter-divider" hidden></div>
+          <div class="log-filter-devices" id="log-filter-devices"></div>
+        </div>
+      </div>
+    </div>
+    <div class="logs-grid" id="logs-grid">
+      <p class="logs-grid-empty" id="logs-grid-empty">Waiting for telemetry... keep the main ground station window open, it's the source of this data.</p>
+    </div>
+  </div>
+
+  <script src="{% static 'connections/js/log-stream.js' %}"></script>
+  <script src="{% static 'connections/js/logs-grid.js' %}"></script>
+</body>
+</html>

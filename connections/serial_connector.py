@@ -6,6 +6,8 @@ import serial
 import configparser
 from datetime import datetime
 
+from .command_types import CommandType
+
 class SerialConnection():
   """
   Attributes
@@ -64,8 +66,8 @@ class SerialConnection():
     self.queue = None
     self.logger_info = None
     self.logger_except = None
-    self.handshake_json =  {"id": "3", "type": 13}
-    self.connected_json = {"id": "3", "type": 14}
+    self.handshake_json =  {"id": "3", "type": CommandType.SERIAL_HANDSHAKE}
+    self.connected_json = {"id": "3", "type": CommandType.SERIAL_CONNECTED}
     self.port = config['serial']['port']
     self.baudrate = int(config['serial']['baudrate'])
 

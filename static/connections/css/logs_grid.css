@@ -1,0 +1,82 @@
+@import url('tokens.css');
+@import url('base.css');
+@import url('components/panel.css');
+@import url('components/log.css');
+
+body {
+  padding: var(--gap);
+}
+
+.grid-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2 * var(--gap));
+  gap: var(--gap);
+}
+
+.grid-toolbar {
+  justify-content: flex-start;
+}
+
+.grid-toolbar-title {
+  margin-right: auto;
+}
+
+.logs-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-auto-rows: minmax(220px, 1fr);
+  gap: var(--gap);
+  overflow-y: auto;
+}
+
+.logs-grid-empty {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  padding: 20px;
+}
+
+.grid-cell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.grid-cell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-panel-alt);
+  flex: 0 0 auto;
+}
+
+.grid-cell-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+}
+
+.grid-cell-toggle {
+  width: 26px;
+  height: 26px;
+}
+
+.grid-cell-toggle .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.grid-cell-stream {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
