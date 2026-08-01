@@ -1,0 +1,30 @@
+<div class="section-container log" id="logs">
+  <div class="log-toolbar">
+    <button type="button" class="log-toolbar-toggle" id="log-autoscroll-toggle" aria-pressed="true" title="Auto-scroll to newest entry">
+      <span class="material-symbols-outlined">vertical_align_bottom</span>
+    </button>
+    <button type="button" class="log-toolbar-toggle" id="log-collapse-toggle" aria-pressed="true" title="Collapse repeated entries">
+      <span class="material-symbols-outlined">unfold_less</span>
+    </button>
+    <button type="button" class="log-toolbar-toggle" id="log-raw-toggle" aria-pressed="false" title="Show raw log content">
+      <span class="material-symbols-outlined">data_object</span>
+    </button>
+    <div class="log-filter" id="log-filter">
+      <button type="button" class="log-toolbar-toggle" id="log-filter-toggle" aria-haspopup="true" aria-expanded="false" title="Filter logs by device">
+        <span class="material-symbols-outlined">filter_alt</span>
+      </button>
+      <div class="log-filter-menu" id="log-filter-menu" hidden>
+        <label class="log-filter-option">
+          <input type="checkbox" id="log-filter-all" checked>
+          <span>All devices</span>
+        </label>
+        <div class="log-filter-divider" id="log-filter-divider" hidden></div>
+        <div class="log-filter-devices" id="log-filter-devices"></div>
+      </div>
+    </div>
+    <button type="button" class="log-toolbar-toggle" id="log-grid-window-toggle" title="Open per-device logs grid window">
+      <span class="material-symbols-outlined">grid_view</span>
+    </button>
+  </div>
+  <div class="log-stream" id="actions-logs"></div>
+</div>

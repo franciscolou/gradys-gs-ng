@@ -1,0 +1,24 @@
+<form>
+  <div class="buttons-set-container">
+    <p class="section-heading">Manage Scripts</p>
+    <label for="upload" class="custom-upload" id="custom-input-label">
+      <span class="material-symbols-outlined" id="input-icon">
+        upload_file
+      </span>
+      Upload Script
+    </label>
+    <input id="upload" type="file">
+    <label for="submit-file" class="custom-submit-file-disabled" id="submit-label">Submit Script</label>
+    <input type="submit" id="submit-file" disabled>
+  </div>
+</form>
+<div class="buttons-set-container">
+  <p class="section-heading">Execute Scripts</p>
+  <div class="buttons-row-container">
+    <select class="select-script">
+      <option value="" disabled selected>Select a script</option>
+    </select>
+    <input class="button" id="refresh-file-list" type="button" value="⭮">
+  </div>
+  <input class="button" id="execute" type="button" value="Execute Script">
+</div>

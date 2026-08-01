@@ -11,11 +11,21 @@ var sendCommandSocket = new WebSocket(`ws://${serverIp}:${serverPort}/ws/receive
 var receivePostSocket = new WebSocket(`ws://${serverIp}:${serverPort}/ws/update-info/`);
 var updateSocket = new WebSocket(`ws://${serverIp}:${serverPort}/ws/update-periodically/`);
 
+// Every parsed message gets forwarded here so the standalone logs grid window (opened from the
+// log toolbar) can render the same data without needing its own websocket connection
+var gsLogsChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('gs-logs-stream') : null;
+
 // List of active devices that'll show at 'select' field
 var activeDevicesId = []
 
-// Control if the log text autoscroll is available or not
-var autoScroll = true;
+// Renders the combined log stream (log-stream.js) - owns auto-scroll, collapse-repeats state,
+// and (while collapsed) pins each device to a fixed rank so it stops fighting other devices
+// for the last position in the stream just because messages arrive interleaved
+var mainLogStream = createLogStream(document.getElementById('actions-logs'), {autoScroll: true, collapse: true});
+
+// Filter state: maps a device key (e.g. "UAV-11") to whether its log entries should be shown
+var deviceFilterState = {};
+var logFilterMenuOpen = false;
 
 if(receivePostSocket.readyState === WebSocket.CONNECTING){
   document.querySelector('#ip-connected').innerText = "Background: Connecting";
@@ -27,26 +37,28 @@ receivePostSocket.addEventListener('open', function (event) {
 });
 
 
-function sendCommand(cmdNumber, buttonType="default", data={}) {
+function sendCommand(cmdNumber, buttonType=ButtonType.DEFAULT, data={}) {
   // Send the selected command to a set of devices, obtained from getDeviceReceive()
   //
   // Format of command-json that will be sent:
   // id - (int) id of the groundstation
-  // cmdNumber - (int) integer that represent what this command will do (see table of commands)
-  // buttonType - (string) default or checkbox
+  // cmdNumber - (CommandType) integer that represent what this command will do
+  // buttonType - (ButtonType) default, checkbox or upload
   // receiver - (int) ID of the active device on the 'select-device list'
   //            note if the command will be sent to all devices, the ID will be 'all'
-  jsonToSend = {id: 1, type: cmdNumber, button_type: buttonType, data: data}
-  jsonToSend["receiver"] = getDeviceReceiver();
+  var commandObject = {id: 1, type: cmdNumber, button_type: buttonType, data: data};
+  commandObject["receiver"] = getDeviceReceiver();
 
-  jsonToSend = JSON.stringify(jsonToSend);
+  var jsonToSend = JSON.stringify(commandObject);
   console.log(jsonToSend);
-  
+
   // Send the command to the Consumers.
   // The PostConsumer will receive the command and handle it
   if (receivePostSocket.readyState == WebSocket.OPEN) {
     receivePostSocket.send(jsonToSend);
-    notifyUiWhenJsonSent(jsonToSend);
+    mainLogStream.addCommandSentEntry(commandObject);
+    // Forward to the standalone Log Mosaic window's "Commands sent" section, if it's open
+    if (gsLogsChannel) gsLogsChannel.postMessage(commandObject);
   }
 
   // The ReceiveCommandConsumer will receive the command and handle it
@@ -108,28 +120,82 @@ function removeCommandOption(id) {
   }
 }
 
-function notifyUiWhenJsonSent(jsonSent, message="Command sent: ") {
-  // Insert on interface visual log the command sent.
-  var element = document.getElementById('actions-logs');
-  var p = document.createElement("p");
-  p.appendChild(document.createTextNode(message + jsonSent));
-  p.className += "json-sent";
+function ensureDeviceFilterOption(deviceKey) {
+  // Register a device in the log filter toolbar the first time it's seen.
+  // Subsequent calls for an already-known device are a no-op.
+  if (deviceFilterState.hasOwnProperty(deviceKey)) return;
+  deviceFilterState[deviceKey] = true;
 
-  element.prepend(p);
+  document.getElementById('log-filter-divider').hidden = false;
+
+  var label = document.createElement('label');
+  label.className = 'log-filter-option';
+
+  var input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = true;
+  input.addEventListener('change', function() {
+    deviceFilterState[deviceKey] = input.checked;
+    syncAllFilterCheckbox();
+    applyDeviceFilterToAllEntries();
+  });
+
+  var span = document.createElement('span');
+  span.textContent = deviceKey;
+
+  label.appendChild(input);
+  label.appendChild(span);
+  document.getElementById('log-filter-devices').appendChild(label);
 }
 
-function notifyUiWhenJsonReceived(jsonReceived, msg) {
-  // Insert on interface visual log the message received
-  var element = document.getElementById('actions-logs');
-  var p = document.createElement("p");
-  p.appendChild(document.createTextNode(msg + jsonReceived));
-  p.className += "json-received";
+function syncAllFilterCheckbox() {
+  // Keeps the "All devices" checkbox checked only while every known device is checked
+  var keys = Object.keys(deviceFilterState);
+  var allChecked = keys.every((key) => deviceFilterState[key]);
+  document.getElementById('log-filter-all').checked = allChecked;
+}
 
-  element.prepend(p);
-  if(autoScroll == true) {
-    var elem= document.getElementById('logs');
-    elem.scroll(0, 0);
+function applyDeviceFilterToEntry(p) {
+  // System/command entries have no device key and are always shown
+  var deviceKey = p.dataset.logDevice;
+  if (!deviceKey) return;
+
+  var visible = deviceFilterState[deviceKey] !== false;
+  p.classList.toggle('log-entry-hidden', !visible);
+}
+
+function applyDeviceFilterToAllEntries() {
+  document.querySelectorAll('#actions-logs [data-log-device]').forEach(applyDeviceFilterToEntry);
+}
+
+function resolveDeviceKey(djangoData) {
+  // Registers the device with the filter toolbar (if new) and returns its display key
+  if (!djangoData || !djangoData.hasOwnProperty('device') || !djangoData.hasOwnProperty('id')) return undefined;
+  var deviceKey = `${djangoData['device'].toUpperCase()}-${djangoData['id']}`;
+  ensureDeviceFilterOption(deviceKey);
+  return deviceKey;
+}
+
+function notifyUiWhenJsonSent(text) {
+  mainLogStream.addSentEntry(text);
+}
+
+function notifyUiWhenJsonReceived(jsonReceived, msg="", djangoData=null) {
+  var deviceKey = resolveDeviceKey(djangoData);
+  // Matches exactly what this used to render pre-styling - see log.css .log-stream--raw and
+  // the rawText handling in log-stream.js.
+  var rawText = msg + jsonReceived;
+  var p;
+
+  if (djangoData && djangoData['type'] === 102) {
+    p = mainLogStream.addTelemetryEntry(djangoData, deviceKey, msg, rawText);
+  } else {
+    var payloadText = djangoData ? formatPayloadForDisplay(djangoData) : jsonReceived;
+    p = mainLogStream.addGenericEntry(deviceKey, deviceKey ? undefined : msg, payloadText, rawText);
   }
+
+  applyDeviceFilterToEntry(p);
+  return p;
 }
 
 function checkJsonType(msg) {
@@ -140,11 +206,11 @@ function checkJsonType(msg) {
   try {
     var djangoData = JSON.parse(msg.data);
     console.log(djangoData);
+    if (gsLogsChannel) gsLogsChannel.postMessage(djangoData);
     json_type = djangoData['type'];
 
-    msgUi = 'ACK: ';
     msgDefault = 'JSON unknown: ';
-    msgDrone = `${djangoData['device'].toUpperCase()}-${djangoData['id']} info: `;
+    msgDrone = djangoData.hasOwnProperty('device') ? `${djangoData['device'].toUpperCase()}-${djangoData['id']} info: ` : msgDefault;
 
     switch(json_type) {
       case 102: // Device information received
@@ -168,7 +234,7 @@ function checkJsonType(msg) {
           }
         }
 
-        notifyUiWhenJsonReceived(msg.data, msgDrone);
+        notifyUiWhenJsonReceived(msg.data, msgDrone, djangoData);
         // Insert/Update the marker on Google Maps, with it's location
         try {
           gmap.newMarker(id, lat, lng, status, deviceType);
@@ -189,12 +255,12 @@ function checkJsonType(msg) {
           selectScriptElement.add(opt);
         });
 
-        notifyUiWhenJsonReceived(msg.data, msgDrone);
+        notifyUiWhenJsonReceived(msg.data, msgDrone, djangoData);
         break;
       // The default behavior to other types not included above
       default:
         msgDefault = djangoData.hasOwnProperty('device') ? msgDrone : msgDefault;
-        notifyUiWhenJsonReceived(msg.data, msgDefault);
+        notifyUiWhenJsonReceived(msg.data, msgDefault, djangoData);
         break;
     }
   } catch(e) {
@@ -203,30 +269,70 @@ function checkJsonType(msg) {
   }
 }
 
-function checkScroll(checkbox) {
-  if(checkbox.checked) {
-    autoScroll = true;
-  }
-  else {
-    autoScroll = false;
-  }
-}
+// Log toolbar
+//-------------------
+document.getElementById('log-autoscroll-toggle').addEventListener('click', function() {
+  var next = this.getAttribute('aria-pressed') !== 'true';
+  this.setAttribute('aria-pressed', String(next));
+  mainLogStream.setAutoScroll(next);
+});
+
+document.getElementById('log-collapse-toggle').addEventListener('click', function() {
+  var next = this.getAttribute('aria-pressed') !== 'true';
+  this.setAttribute('aria-pressed', String(next));
+  mainLogStream.setCollapse(next);
+});
+
+document.getElementById('log-raw-toggle').addEventListener('click', function() {
+  var next = this.getAttribute('aria-pressed') !== 'true';
+  this.setAttribute('aria-pressed', String(next));
+  mainLogStream.setRawMode(next);
+});
+
+document.getElementById('log-grid-window-toggle').addEventListener('click', function() {
+  window.open('/logs-grid/', 'gs-logs-grid', 'width=1400,height=900,resizable=yes,scrollbars=yes');
+});
+
+document.getElementById('log-filter-toggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  logFilterMenuOpen = !logFilterMenuOpen;
+  document.getElementById('log-filter-menu').hidden = !logFilterMenuOpen;
+  document.getElementById('log-filter-toggle').setAttribute('aria-expanded', logFilterMenuOpen);
+});
+
+document.getElementById('log-filter-menu').addEventListener('click', function(e) {
+  e.stopPropagation();
+});
+
+document.addEventListener('click', function() {
+  if (!logFilterMenuOpen) return;
+  logFilterMenuOpen = false;
+  document.getElementById('log-filter-menu').hidden = true;
+  document.getElementById('log-filter-toggle').setAttribute('aria-expanded', false);
+});
+
+document.getElementById('log-filter-all').addEventListener('change', function(e) {
+  var checked = e.target.checked;
+  Object.keys(deviceFilterState).forEach((key) => deviceFilterState[key] = checked);
+  document.querySelectorAll('#log-filter-devices input[type="checkbox"]').forEach((input) => input.checked = checked);
+  applyDeviceFilterToAllEntries();
+});
 
 function checkLand(checkbox) {
   if(checkbox.checked) {
-    sendCommand(28, "checkbox");
+    sendCommand(CommandType.LAND, ButtonType.CHECKBOX);
   }
   else {
-    sendCommand(29, "checkbox");
+    sendCommand(CommandType.LAND_STOP, ButtonType.CHECKBOX);
   }
 }
 
 function checkRtl(checkbox) {
   if(checkbox.checked) {
-    sendCommand(30, "checkbox");
+    sendCommand(CommandType.RTL, ButtonType.CHECKBOX);
   }
   else {
-    sendCommand(31, "checkbox");
+    sendCommand(CommandType.RTL_STOP, ButtonType.CHECKBOX);
   }
 }
 
@@ -266,28 +372,21 @@ updateSocket.onclose = function(e) {
 
 // Onclick functions
 //-------------------
-// Table of commands:
-// 20: /telemetry/gps
-// 22: /telemetry/ned
-// 24: /command/arm
-// 26: /command/takeoff
-// 28: /command/land
-// 30: /command/rtl
-// 32: /command/takeoff
+// See CommandType (log-stream.js) for what each command number maps to.
 document.querySelector('#position-gps').onclick = function(e) {
-  sendCommand(20);
+  sendCommand(CommandType.GPS_POSITION);
 };
 
 document.querySelector('#position-ned').onclick = function(e) {
-  sendCommand(22);
+  sendCommand(CommandType.NED_POSITION);
 };
 
 document.querySelector('#arm').onclick = function(e) {
-  sendCommand(24);
+  sendCommand(CommandType.ARM);
 }
 
 document.querySelector('#takeoff').onclick = function(e) {
-  sendCommand(26);
+  sendCommand(CommandType.TAKEOFF);
 };
 
 
@@ -296,32 +395,32 @@ form.addEventListener('submit', (e) => {
   // Logic for submit button, to upload a file
   // It will make a post request to the form 'action' address
   let fileInput = document.getElementById('upload');
-  
+
   let file = fileInput.files[0]
   if (file) {
     const reader = new FileReader();
-  
+
     reader.onload = function(event) {
         // event.target.result contém: "data:text/x-python;base64,YmFzZTY0..."
         const fullDataUrl = event.target.result;
-        
+
         // Remove o prefixo para obter apenas o conteúdo Base64 puro
         const base64Content = fullDataUrl.split(',')[1];
-        
+
         // Monta o objeto final
         const fileData = {
           "filename": file.name,
           "content": base64Content,
           "type": "text/plain"
         };
-        
-        sendCommand(44, buttonType="upload", data=fileData);
+
+        sendCommand(CommandType.UPLOAD_SCRIPT, ButtonType.UPLOAD, fileData);
       }
-      
+
       reader.readAsDataURL(fileInput.files[0])
-      notifyUiWhenJsonSent("File uploaded sent!", "")
+      notifyUiWhenJsonSent("File uploaded sent!")
   } else {
-      notifyUiWhenJsonSent("No file was uploaded!", "")
+      notifyUiWhenJsonSent("No file was uploaded!")
   }
   e.preventDefault();
 });
@@ -350,11 +449,11 @@ inputBtn.addEventListener('input', () => {
 });
 
 document.querySelector('#refresh-file-list').onclick = function(e) {
-  sendCommand(42);
+  sendCommand(CommandType.LIST_SCRIPTS);
 }
 
 const script_select = document.querySelector(".select-script")
 
 document.querySelector('#execute').onclick = function(e) {
-  sendCommand(46, "default", {script_name: script_select.value});
+  sendCommand(CommandType.EXECUTE_SCRIPT, ButtonType.DEFAULT, {script_name: script_select.value});
 }

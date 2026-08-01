@@ -1,0 +1,33 @@
+:root {
+  /* Base surfaces - tactical HUD, near-black navy */
+  --color-bg: #0f1923;
+  --color-panel: #131f29;
+  --color-panel-alt: #1a2733;
+  --color-border: #2e4052;
+  --color-border-strong: #4a6377;
+
+  /* Accents */
+  --color-accent: #9fc131;
+  --color-accent-dim: #6d8a22;
+  --color-warning: #e3a93b;
+  --color-danger: #d9453d;
+
+  /* Text */
+  --color-text: #d7dfe3;
+  --color-text-muted: #7c8c99;
+  --color-text-disabled: #46545e;
+
+  /* Typography */
+  --font-display: 'Rajdhani', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+
+  /* Metrics */
+  --border-width: 2px;
+  --chamfer: 10px;
+  --gap: 10px;
+  --resizer-height: 10px;
+
+  /* Legacy aliases read directly by main.js (getComputedStyle) - keep in sync with --color-accent / --color-text-disabled */
+  --primary-color: var(--color-accent);
+  --dark-gray-color: var(--color-text-disabled);
+}

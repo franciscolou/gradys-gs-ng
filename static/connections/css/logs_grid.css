@@ -1,0 +1,156 @@
+@import url('tokens.css');
+@import url('base.css');
+@import url('components/panel.css');
+@import url('components/log.css');
+@import url('components/row-resizer.css');
+
+body {
+  padding: var(--gap);
+}
+
+.grid-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2 * var(--gap));
+  gap: var(--gap);
+}
+
+.grid-toolbar {
+  justify-content: flex-start;
+}
+
+.grid-toolbar-title {
+  margin-right: auto;
+}
+
+/* Height pinned above the per-device grid, but draggable via #commands-row-resizer below -
+   not a device, so it never competes with .logs-grid's cells for space */
+.grid-commands-section {
+  flex: 0 0 var(--commands-section-height, 220px);
+  min-height: 120px;
+}
+
+.grid-page .row-resizer {
+  flex: 0 0 var(--resizer-height);
+}
+
+.logs-grid {
+  flex: 1 1 auto;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  overflow-y: auto;
+}
+
+/* Row membership (which devices share a row) is decided in logs-grid.js's relayout(), not by
+   browser wrap heuristics - nowrap keeps that decision authoritative instead of the browser
+   silently overriding it based on pixel widths. */
+.grid-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  gap: var(--gap);
+}
+
+.logs-grid-empty {
+  color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  padding: 20px;
+}
+
+.grid-cell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* .grid-cell's own display:flex has the same specificity as log.css's .log-entry-hidden and is
+   declared later (log.css is only @imported at the top of this file), so it would otherwise win
+   and silently keep filtered-out device cells visible. The extra class bumps specificity so
+   hidden cells actually disappear regardless of import order. */
+.grid-cell.log-entry-hidden {
+  display: none;
+}
+
+/* Per-device cells (not the fixed Ground station section) get a drag handle in their
+   bottom-right corner (see .grid-cell-resize-handle) so the mosaic layout can be tuned to
+   taste - width is a flex-grow share of its row (flex-basis: 0, so the row's full width is
+   always split across its cells by weight - equal weights by default), and height comes from
+   the row's own height via stretch (all cells in a row share one height). See logs-grid.js. */
+.grid-row > .grid-cell {
+  position: relative;
+  flex-grow: 1;
+  flex-shrink: 0;
+  flex-basis: 0;
+  min-width: 320px;
+  min-height: 160px;
+  /* hidden, not auto/visible: the header+stream flex split can be a couple px off from the
+     box's own rounded height, and overflow:auto would surface that as a spurious outer
+     scrollbar on top of .grid-cell-stream's own scrollbar. */
+  overflow: hidden;
+}
+
+.grid-cell-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.grid-cell-resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-accent-dim);
+  border-bottom: 2px solid var(--color-accent-dim);
+  transition: border-color 120ms linear;
+}
+
+.grid-cell-resize-handle:hover::before,
+.grid-cell.is-resizing .grid-cell-resize-handle::before {
+  border-color: var(--color-accent);
+}
+
+.grid-cell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-panel-alt);
+  flex: 0 0 auto;
+}
+
+.grid-cell-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+}
+
+.grid-cell-toggle {
+  width: 26px;
+  height: 26px;
+}
+
+.grid-cell-toggle .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.grid-cell-stream {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

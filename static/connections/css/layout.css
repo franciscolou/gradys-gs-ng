@@ -1,0 +1,79 @@
+.page-container {
+  display: grid;
+  height: 100vh;
+  grid-template-columns: 1.6fr 0.4fr;
+  grid-template-rows: var(--row-map, 1.5fr) var(--resizer-height) var(--row-log, 0.5fr);
+  gap: var(--gap);
+  padding: var(--gap);
+}
+
+.grid-template-area {
+  grid-template-areas:
+    "map btns"
+    "resizer btns"
+    "log btns";
+}
+
+.map-container {
+  grid-area: map;
+  min-height: 0;
+}
+
+#map {
+  height: 100%;
+  filter: saturate(0.85) contrast(1.05);
+}
+
+.command-buttons {
+  /* horizontal scroll is never legitimate here - everything inside is capped to the column's
+     width (max-width: 100%) - so it's hidden outright rather than left on "auto". Leaving
+     overflow-x as the default "visible" would otherwise get it silently recomputed to "auto"
+     by the spec (a non-"visible" overflow-y forces the other axis out of "visible" too), surfacing
+     a horizontal scrollbar from mere sub-pixel layout rounding. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  grid-area: btns;
+  display: flex;
+  flex-direction: column;
+}
+
+.log {
+  grid-area: log;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .page-container {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .grid-template-area {
+    grid-template-areas:
+      "map"
+      "btns"
+      "log";
+  }
+
+  .map-container {
+    height: 55vh;
+  }
+
+  .command-buttons {
+    overflow-y: visible;
+  }
+
+  .log {
+    max-height: 35vh;
+  }
+
+  .row-resizer {
+    display: none;
+  }
+}

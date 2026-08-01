@@ -1,0 +1,313 @@
+.log {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.log-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-panel-alt);
+  flex: 0 0 auto;
+}
+
+.log-filter {
+  position: relative;
+}
+
+.log-toolbar-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  border: 2px solid var(--color-border-strong);
+  transition: color 120ms linear, border-color 120ms linear;
+}
+
+.log-toolbar-toggle .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.log-toolbar-toggle:hover,
+.log-toolbar-toggle[aria-expanded="true"],
+.log-toolbar-toggle[aria-pressed="true"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.log-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 170px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-panel);
+  border: 2px solid var(--color-border-strong);
+  padding: 8px;
+}
+
+.log-filter-option {
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  white-space: nowrap;
+  background-color: transparent;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+
+.log-filter-option:hover {
+  background-color: var(--color-panel-alt);
+}
+
+/* Selected = solid accent fill instead of a native checkbox mark */
+.log-filter-option:has(input:checked) {
+  background-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.log-filter-option:has(input:checked):hover {
+  background-color: var(--color-accent-dim);
+}
+
+.log-filter-option input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.log-filter-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--color-border);
+}
+
+.log-stream {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px;
+  /* display:flex + order lets each device keep a fixed rank while collapse is active, so two
+     devices' visible lines never swap places just from one updating more often than the other -
+     without moving anything in the DOM or duplicating it anywhere - see log-stream.js */
+  display: flex;
+  flex-direction: column;
+}
+
+.json-sent,
+.json-received {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  word-break: break-word;
+}
+
+.json-sent {
+  color: var(--color-accent);
+}
+
+.json-sent::before {
+  content: '> ';
+  color: var(--color-text-muted);
+}
+
+.json-received {
+  color: var(--color-text);
+}
+
+.json-received::before {
+  content: '< ';
+  color: var(--color-text-muted);
+}
+
+.log-seq {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  margin-right: 10px;
+}
+
+/* Structured telemetry entries: labeled fields instead of a raw JSON blob */
+.log-entry-structured {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 4px;
+}
+
+/* The plain-text pre-styling equivalent of a structured/badge entry - see .log-view-raw below
+   and createLogStream's rawText handling in log-stream.js. Hidden unless raw mode is on. */
+.log-view-raw {
+  display: none;
+  white-space: pre-wrap;
+}
+
+.log-stream--raw .log-view-styled {
+  display: none;
+}
+
+.log-stream--raw .log-view-raw {
+  display: inline;
+}
+
+/* The device/receiver badge makes the '< '/'> ' direction marker redundant, so styled mode hides
+   it for structured entries - but raw mode has no badge, so the marker should show there instead */
+.log-stream:not(.log-stream--raw) p:has(> .log-view-styled.log-entry-structured)::before {
+  content: none;
+}
+
+.log-device-badge {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 1px 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-bg);
+  background-color: var(--color-accent-dim);
+}
+
+/* Outlined (vs. .log-device-badge's filled look) to read as "target" rather than "source" */
+.log-receiver-badge {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 5px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  background-color: transparent;
+  border: 1px solid var(--color-accent-dim);
+}
+
+.log-command-name .log-field-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  text-transform: uppercase;
+}
+
+.log-button-type .log-field-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.log-button-type--default .log-field-value {
+  color: var(--color-text-muted);
+}
+
+.log-button-type--checkbox .log-field-value {
+  color: var(--color-warning);
+}
+
+.log-button-type--upload .log-field-value {
+  color: var(--color-accent);
+}
+
+/* 'data' can hold an unbounded number of keys, so it's never printed inline - only this instant
+   hover (no transition delay) reveals the raw JSON, via the .log-hover-tooltip element below */
+.log-field--hoverable {
+  cursor: help;
+  border-bottom: 1px dashed var(--color-text-muted);
+}
+
+/* Positioned by JS (setupHoverTooltip in log-stream.js), not CSS: it needs the field's real
+   viewport position to flip above/below and clamp horizontally, which attr()/::after can't do.
+   position:fixed + living on <body> also escapes the grid cells' `overflow-y: auto` (see
+   .grid-cell-stream in logs_grid.css), so it's never clipped or covered by a neighbouring cell. */
+.log-hover-tooltip {
+  position: fixed;
+  z-index: 1000;
+  visibility: hidden;
+  max-width: 360px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--color-panel);
+  border: 2px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.log-hover-tooltip--visible {
+  visibility: visible;
+}
+
+.log-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-right: 14px;
+}
+
+.log-field-label {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.log-field-value {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.log-method .log-field-value,
+.log-meta .log-field-value {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.log-method .log-field-value {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.log-status .log-field-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.log-status--active .log-field-value {
+  color: var(--color-accent);
+}
+
+.log-status--on_hold .log-field-value {
+  color: var(--color-warning);
+}
+
+.log-status--inactive .log-field-value {
+  color: var(--color-text-disabled);
+}
+
+/* Must stay last: needs to win the cascade over .log-entry-structured's display:flex */
+.log-entry-hidden,
+.log-entry-collapsed {
+  display: none;
+}

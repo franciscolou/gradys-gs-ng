@@ -4,80 +4,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet"  href="{%  static  'connections/css/connection.css'  %}">
-  <link rel="stylesheet" href="https://fonts.sandbox.google.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link rel="stylesheet" href="{% static 'connections/css/connection.css' %}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
   <title>Ground station</title>
   <script src="{% static 'connections/js/gmap.js' %}"></script>
 </head>
   <body>
     <div class="page-container grid-template-area">
-      <div class="section-container map-container">
-        <div id="map"></div>
-      </div>
-      <div class="section-container command-buttons">
-        <div class="select-container">
-          <p>Select the device</p>
-          <select class="select-device" id="select-device">
-            <option value="all">Send to all</option>
-          </select>
-        </div>
-        <div class="buttons-set-container">
-          <p>Get Location</p>
-          <input class="button" id="position-gps" type="button" value="GPS Position">
-          <input class="button" id="position-ned" type="button" value="NED Position">
-        </div>
-        <div class="buttons-set-container">
-          <p>Flight Commands</p>
-          <input class="button" id="arm" type="button" value="Arm">
-          <input class="button" id="takeoff" type="button" value="Takeoff">
-          <div class="checkbox-container">
-            <input type="checkbox" name="abort-all-checkbox" id="land" onclick="checkLand(this)" class="custom-checkbox"/>
-            <label for="land" class="label">Land</label>
-          </div>
-          <div class="checkbox-container">
-            <input type="checkbox" name="abort-all-checkbox" id="rtl" onclick="checkRtl(this)" class="custom-checkbox"/>
-            <label for="rtl" class="label">RTL</label>
-          </div>
-        </div>
-          <form>
-            <div class="buttons-set-container">
-              <p>Manage Scripts</p>
-              <label for="upload" class="custom-upload" id="custom-input-label">
-                <span class="material-symbols-outlined" id="input-icon">
-                  upload_file
-                </span>
-                Upload Script
-              </label>
-              <input id="upload" type="file">
-              <label for="submit-file" class="custom-submit-file-disabled" id="submit-label">Submit Script</label>
-              <input type="submit" id="submit-file" disabled>
-            </div>
-          </form>
-        <div class="buttons-set-container">
-          <p>Execute Scripts</p>
-          <div>
-            <select class="select-script">
-              <option value="" disabled selected>Select a script</option>
-            </select>
-            <input class="button" id="refresh-file-list" type="button" value="⭮">
-          </div>
-          <input class="button" id="execute" type="button" value="Execute Script">
-        </div>
-        <div class="buttons-set-container">
-          <p>Configuration</p>
-          <div class="checkbox-container">
-            <input type="checkbox" name="scroll-checkbox" id="scroll" onclick="checkScroll(this)" class="custom-checkbox" checked />
-            <label for="scroll" class="label">Auto Scroll</label>
-          </div>
-        </div>
-        <div class="connection-status">
-          <div id="ip-connected"></div>
-          <div id="ip-disconnected"></div>
-        </div>
-      </div>
-      <div class="section-container log" id="logs">
-        <div id="actions-logs"></div>
-      </div>
+      {% include 'connections/components/_map_panel.html' %}
+      {% include 'connections/components/_row_resizer.html' %}
+      {% include 'connections/components/_command_panel.html' %}
+      {% include 'connections/components/_log_panel.html' %}
     </div>
 
     <script
@@ -88,7 +25,9 @@
   <script>
     var serverAddress = "{{server_address}}";
   </script>
+  <script src="{% static 'connections/js/log-stream.js' %}"></script>
   <script src="{% static 'connections/js/main.js' %}"></script>
+  <script src="{% static 'connections/js/panel-resizer.js' %}" defer></script>
 
 </body>
 </html>

@@ -1,0 +1,73 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+}
+
+body {
+  background-image:
+    linear-gradient(var(--color-panel) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-panel) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+h1, h2, h3, p, label {
+  font-family: var(--font-display);
+}
+
+.section-heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.section-heading::before {
+  content: '// ';
+  color: var(--color-accent-dim);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* Tactical scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent-dim) var(--color-panel);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--color-panel);
+  border-left: 1px solid var(--color-border);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-accent-dim);
+  border: 2px solid var(--color-panel);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-accent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--color-panel);
+}
