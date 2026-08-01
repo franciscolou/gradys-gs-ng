@@ -97,6 +97,27 @@ Remember to insert, inside config.ini file, the correct IP + Port, on [post] cat
 ## Connecting to home page
 Now you should be able to connect to the home page, acessing, on your browser, the IP/PORT the server is up, on default: localhost:8000.
 
+## Interface overview
+The home page is split in three panels: the **map**, the **command panel** (right column) and the **log panel** (bottom).
+
+The handle between the map and the log panel can be dragged to resize both rows. The chosen split is saved in the browser's `localStorage`, so it survives a reload.
+
+### Log toolbar
+The log panel has a toolbar with the following toggles:
+<!--ts-->
+* **Auto-scroll** (`vertical_align_bottom`): keeps the stream pinned to the newest entry. When off, the scroll position stays where the user left it.
+* **Collapse repeated entries** (`unfold_less`): groups consecutive messages of the same device into a single line that updates in place, with a counter, instead of flooding the stream with repeated telemetry. While collapsed, each device keeps a fixed position in the stream, so devices don't swap places just because their messages arrive interleaved.
+* **Raw content** (`data_object`): switches the formatted entries (labeled `lat`/`lng`/`alt`/status fields) back to the plain JSON text that the back-end sent.
+* **Device filter** (`filter_alt`): a dropdown listing every device seen so far, plus an "All devices" checkbox. Unchecking a device hides its entries from the stream. Entries with no device attached (system messages and commands sent) are always shown.
+* **Log Mosaic** (`grid_view`): opens the standalone per-device log window described below.
+<!--te-->
+
+### Log Mosaic window
+The `logs-grid/` URL renders a standalone window where each device gets its own log cell, plus a dedicated section for the commands the ground station sent.
+
+This window has **no websocket of its own**: the main window forwards every parsed message over a [BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel) named `gs-logs-stream`, so the mosaic only receives data while the main ground station window/tab stays open.
+
+Its toolbar mirrors the main log toolbar (auto-scroll, collapse, raw, device filter), applying each toggle to every cell at once. Every cell also has its own collapse toggle and a drag handle to resize it: dragging horizontally redistributes the width between the cells of the same row, dragging vertically resizes the row's height. The sizes are persisted in `localStorage`, so the mosaic layout survives a reload.
 
 
 # Project Architecture and customization
@@ -223,11 +244,50 @@ The home page template file is rendered when the default ip+port is accessed, as
 ```
 The code above introduces the '{% %}' tag (that's not HTML native), in this case, to load a css file to the page.
 For more information about [templates, you can access here](https://docs.djangoproject.com/en/3.2/topics/templates/).
+
+### Template components
+***index.html*** doesn't hold the interface's markup itself: it's only a skeleton that includes the panels, each one living in its own partial inside **/templates/connections/components/**.
+```html
+<div class="page-container grid-template-area">
+  {% include 'connections/components/_map_panel.html' %}
+  {% include 'connections/components/_row_resizer.html' %}
+  {% include 'connections/components/_command_panel.html' %}
+  {% include 'connections/components/_log_panel.html' %}
+</div>
+```
+`_command_panel.html` is itself only a container, including the partial of each group of controls (`_device_selector.html`, `_telemetry_commands.html`, `_flight_commands.html`, `_script_manager.html` and `_connection_status.html`). So, when adding a new control to the interface, it should be added to the partial of the group it belongs to (or to a new partial, included by `_command_panel.html`), not to *index.html*.
+
+### CSS
+***connection.css*** is the only stylesheet loaded by *index.html*, and it's just a manifest of `@import`s:
+```css
+@import url('tokens.css');
+@import url('base.css');
+@import url('layout.css');
+@import url('components/panel.css');
+@import url('components/button.css');
+...
+```
+<!--ts-->
+* ***tokens.css***: the design tokens (colors, fonts, borders, spacing) as CSS custom properties. Changing the interface's whole color scheme is a matter of changing the variables in this single file. Note that *main.js* reads `--primary-color` and `--dark-gray-color` from here through `getComputedStyle`, so those aliases must be kept in sync.
+* ***base.css***: element resets and the shared typography (like the `.section-heading` class).
+* ***layout.css***: the home page's grid (map / commands / log), including the responsive rules for narrow screens.
+* ***components/***: one file per interface component (`button.css`, `checkbox.css`, `select.css`, `upload.css`, `panel.css`, `row-resizer.css`, `connection-status.css`, `log.css`).
+<!--te-->
+The Log Mosaic window has its own entry point, ***logs_grid.css***, that imports the same tokens/base/components and adds the mosaic's grid rules.
+
+### Javascript
 To load a Javascript file in a template, the logic is the same, as long this Javascript file is inside the folder that ***STATIC_URL variable*** is pointing to. This variable is inside **config/settings.py**. In our case STATIC_URL variable is pointing to /static/ folder.
 ```python
 STATIC_URL = '/static/'
 ```
-Our ***index.html*** home page template loads ***gmap.js***, responsible for Google Map's virtual map and ***main.js***, responsible for starting websockets connections with the back-end and the main button's logic.
+Our ***index.html*** home page template loads:
+<!--ts-->
+* ***gmap.js***: responsible for Google Map's virtual map.
+* ***log-stream.js***: shared log rendering, used by both the home page and the Log Mosaic window. It exposes `createLogStream(element, options)`, which returns an object with `addTelemetryEntry`, `addGenericEntry`, `addCommandSentEntry` and `addSentEntry`, and owns the auto-scroll, collapse-repeats and raw-content behaviors. It also holds the ***CommandType*** and ***ButtonType*** constants, mirroring the back-end (see Command Types below).
+* ***main.js***: responsible for starting websockets connections with the back-end and the main button's logic. It feeds the log stream and forwards every message to the Log Mosaic window over the `gs-logs-stream` BroadcastChannel.
+* ***panel-resizer.js***: drag-to-resize of the map/log split. Self-contained, it doesn't read or write any state the other scripts depend on.
+<!--te-->
+The ***logs_grid.html*** template loads *log-stream.js*, ***logs-grid.js*** (the per-device cells, their layout and the BroadcastChannel listener) and ***mosaic-resizer.js***.
 To start a websocket connection, you have to create a new object, sending an available URL in the routing schema (see Routing/Consumers topic).
 ```javascript
 var socket = new WebSocket('ws://localhost:8000/ws/connection/');
@@ -370,12 +430,12 @@ Important things to notice are:
 Another important functionality in this framework is the possibility to send commands, through the interface, to available devices.
 We can register a new button inside the template, create a onClick callback function and send the command via websocket to Django (back-end).
 <!--ts-->
-* Create new button in ***/templates/index.html***
+* Create new button in the component partial of the group it belongs to, inside ***/templates/connections/components/*** (for example, ***_flight_commands.html*** for a flight command). *index.html* only includes these partials, so nothing needs to be changed there.
 ```html
 <input class="button" id="new-button" type="button" value="New Command">
 ```
 
-* Register an onclick function, in ***/static/connections/main.js***
+* Register an onclick function, in ***/static/connections/js/main.js***
 ```javascript
 var newCommandNumber = 40
 
@@ -397,9 +457,32 @@ function sendCommand(type) {
 Notice that the socket object must be instatiated already, and the connection 'OPEN'.
 The corresponding Consumer will receive the message and handle, acording to it's command type.
 
-A button can contain a different type, as checkbox. This button will have a different logic then a regular button. A specific thread will handle the command, repeating until the checkbox is unmarked. Marking a checkbox will result on the creation of a thread, unmarking it will cancel this thread. In order to create a checkbox button, you need to change the type to type="checkbox", on index.html, and pass the argument "checkbox" when creating a event handler on main.js: sendCommand(30, "checkbox");
+A button can contain a different type, as checkbox. This button will have a different logic then a regular button. A specific thread will handle the command, repeating until the checkbox is unmarked. Marking a checkbox will result on the creation of a thread, unmarking it will cancel this thread. In order to create a checkbox button, you need to change the type to type="checkbox", on the component partial, and pass the argument `ButtonType.CHECKBOX` when creating a event handler on main.js: sendCommand(CommandType.RTL, ButtonType.CHECKBOX);
 
 The button type will be insert inside the JSON message, sent by main.js to the corresponding Consumer. So the Consumer will know this is not a regular command, and will create or cancel a thread.
+
+### Command Types
+The numeric `type` codes exchanged between the ground station, the devices and the serial link are declared as an `IntEnum` in ***/connections/command_types.py***, so the back-end doesn't spread magic numbers around:
+```python
+class CommandType(IntEnum):
+  SERIAL_HANDSHAKE = 13
+  ...
+  GPS_POSITION = 20
+  NED_POSITION = 22
+  ARM = 24
+  ...
+  ACK_ERROR = 101
+  POSITION_INFO = 102
+  ACK_SUCCESS = 103
+```
+This enum is mirrored on the front-end, in the ***CommandType*** constant at the top of */static/connections/js/log-stream.js*, which also maps each code to the label shown in the log. The `ButtonType` constant (`default`, `checkbox`, `upload`) lives in the same file, and defines how `PostConsumer.send_via_http` handles the command.
+
+When adding a new command, it must be kept in sync in **three** places:
+<!--ts-->
+* `CommandType`, in */connections/command_types.py*.
+* `CommandType` and `COMMAND_TYPE_LABELS`, in */static/connections/js/log-stream.js*.
+* the `[commands-list]` section of *config.ini*, that maps the code to the endpoint/HTTP method used to reach the device (`POSITION_INFO` is instead declared in `[internal-protocol]`).
+<!--te-->
 
 ### Command button logic
 You already have a button on interface that sends a command, in this case '40', to a Consumer. This Consumer will be in charge to the command logic.
@@ -515,6 +598,7 @@ This is the main app's folder, with the necessary tools to allow connections and
     |   ├── LOGS                # Stores all .log files generated
     |   ├── utils               # Auxiliary tools
     |   ├── ...
+    |   ├── command_types.py    # CommandType enum with the numeric codes of the protocol
     |   ├── routing.py          # Paths for websocket connections
     |   ├── serial_connector.py # Auxiliary class to stablish/handle connection with esp32 device
     |   ├── urls.py             # Paths for views
@@ -527,7 +611,10 @@ This folder contains the files written with template language. These files can b
     .
     ├── ...             
     ├── templates
-    |   ├── index.html   # Home page, runs main.js
+    |   ├── connections
+    |   |    └── components  # Partials included by index.html (one per panel/group of controls)
+    |   ├── index.html       # Home page, runs main.js
+    |   ├── logs_grid.html   # Log Mosaic window, runs logs-grid.js
     └── ...
 
 **Static**
@@ -544,9 +631,15 @@ In the **templates files**, can be used the static template tag to build the URL
     .
     ├── ...             
     ├── static
-    |   ├── connections   # Folder to separate the main app's static files
-    |   |    ├── css      # All css used inside connections
-    |   |    ├── images   # All images used in the project
-    |   |    ├── js       # All javascript files
+    |   ├── connections        # Folder to separate the main app's static files
+    |   |    ├── css           # All css used inside connections
+    |   |    |    ├── components   # One file per interface component
+    |   |    |    ├── tokens.css   # Design tokens (colors, fonts, metrics)
+    |   |    |    ├── base.css     # Resets and shared typography
+    |   |    |    ├── layout.css   # Home page grid
+    |   |    |    ├── connection.css # Entry point of the home page (imports the files above)
+    |   |    |    └── logs_grid.css  # Entry point of the Log Mosaic window
+    |   |    ├── images        # All images used in the project
+    |   |    ├── js            # All javascript files
         └──
     └── ...
