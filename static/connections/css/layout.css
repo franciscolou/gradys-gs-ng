@@ -25,6 +25,20 @@
 }
 
 .command-buttons {
+  /* This element carries .section-container's border and corner-bracket decorations
+     (::before/::after). It must NOT be the scrolling element itself - an absolutely
+     positioned pseudo-element pinned to the bottom/right of a container that scrolls its
+     own content scrolls along with that content (it isn't position: sticky), so the
+     brackets would drift away from the panel's true visible edges as soon as the content
+     overflowed. Scrolling instead happens on the .command-buttons-scroll child below, so
+     this outer box - and its brackets - always stay pinned to the panel's actual bounds. */
+  grid-area: btns;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.command-buttons-scroll {
   /* horizontal scroll is never legitimate here - everything inside is capped to the column's
      width (max-width: 100%) - so it's hidden outright rather than left on "auto". Leaving
      overflow-x as the default "visible" would otherwise get it silently recomputed to "auto"
@@ -33,7 +47,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   min-height: 0;
-  grid-area: btns;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -65,7 +79,7 @@
     height: 55vh;
   }
 
-  .command-buttons {
+  .command-buttons-scroll {
     overflow-y: visible;
   }
 

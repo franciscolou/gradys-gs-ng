@@ -225,6 +225,10 @@ function checkJsonType(msg) {
           if(status != 'inactive') {
             activeDevicesId.push(id);
             pushNewCommandOption(id, deviceType);
+            // A newly-discovered device is the first chance we have to actually reach it, so
+            // fetch its script list now instead of waiting for a manual refresh click - this is
+            // what makes the dropdown populated on page load/refresh without user action.
+            sendCommand(CommandType.LIST_SCRIPTS);
           }
         }
         else {
@@ -254,6 +258,21 @@ function checkJsonType(msg) {
           var opt = new Option(scriptName, scriptName);
           selectScriptElement.add(opt);
         });
+
+        // The <select> always resets to the placeholder option on refresh, so any
+        // previously-rendered argument fields no longer correspond to a selected script.
+        clearScriptArgs();
+        setAddManualArgVisible(false);
+
+        notifyUiWhenJsonReceived(msg.data, msgDrone, djangoData);
+        break;
+      case 48: // Script argument specs received
+        // No request-id correlation exists on this protocol, so a fast script-switch could let
+        // a stale response for a previously-selected script overwrite the current selection's
+        // form - only render if this response is actually for the script still selected.
+        if (djangoData['script'] === document.querySelector('.select-script').value) {
+          renderScriptArgs(djangoData['args'] || []);
+        }
 
         notifyUiWhenJsonReceived(msg.data, msgDrone, djangoData);
         break;
@@ -433,6 +452,7 @@ inputBtn.addEventListener('input', () => {
   let submitBtn = document.getElementById("submit-file");
   let submitLabel = document.getElementById("submit-label");
   let inputIcon = document.getElementById("input-icon");
+  let selectedFilename = document.getElementById("selected-filename");
   let primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
   let darkGrayColor = getComputedStyle(document.documentElement).getPropertyValue('--dark-gray-color');
 
@@ -440,11 +460,13 @@ inputBtn.addEventListener('input', () => {
     submitBtn.disabled = false;
     submitLabel.className = "custom-submit-file";
     inputIcon.style.color = primaryColor;
+    selectedFilename.textContent = inputBtn.files[0].name;
   }
   else {
     submitBtn.disabled = true;
     submitLabel.className = "custom-submit-file-disabled";
     inputIcon.style.color = darkGrayColor;
+    selectedFilename.textContent = "";
   }
 });
 
@@ -453,7 +475,132 @@ document.querySelector('#refresh-file-list').onclick = function(e) {
 }
 
 const script_select = document.querySelector(".select-script")
+const script_args_container = document.querySelector("#script-args-container")
+
+function clearScriptArgs() {
+  script_args_container.innerHTML = '';
+}
+
+const add_manual_arg_btn = document.querySelector('#add-manual-arg');
+
+function setAddManualArgVisible(visible) {
+  add_manual_arg_btn.style.display = visible ? '' : 'none';
+}
+
+function renderScriptArgs(specs) {
+  // Fully clear and rebuild (rather than diff) so a zero-arg script just leaves an empty
+  // container, and stale rows from a previously-selected script never linger.
+  clearScriptArgs();
+
+  specs.forEach((spec) => {
+    var row = document.createElement('div');
+    row.className = 'arg-row';
+
+    var label = document.createElement('label');
+    label.className = 'arg-label';
+    label.textContent = spec.name;
+
+    var input = document.createElement('input');
+    input.className = 'arg-input';
+    input.dataset.argName = spec.name;
+
+    if (spec.takes_value) {
+      input.type = 'text';
+      if (spec.default !== null && spec.default !== undefined) {
+        input.placeholder = String(spec.default);
+      }
+    } else {
+      // store_true/store_false: presence enables it, so this is a checkbox rather than a text
+      // field a user could type "false" into and still have it enable the flag.
+      input.type = 'checkbox';
+    }
+
+    row.appendChild(label);
+    row.appendChild(input);
+    script_args_container.appendChild(row);
+  });
+}
+
+add_manual_arg_btn.onclick = function(e) {
+  // Fallback for argument names introspection can't see (e.g. added through an imported
+  // helper function rather than a literal parser.add_argument(...) call in the script file).
+  var row = document.createElement('div');
+  row.className = 'arg-row arg-row-manual';
+
+  var nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'arg-name-input';
+  nameInput.placeholder = 'argument name';
+
+  var typeSelect = document.createElement('select');
+  typeSelect.className = 'arg-type-select';
+  typeSelect.add(new Option('Text', 'text'));
+  typeSelect.add(new Option('Boolean', 'boolean'));
+
+  var valueInput = document.createElement('input');
+  valueInput.type = 'text';
+  valueInput.className = 'arg-value-input';
+  valueInput.placeholder = 'value';
+
+  var valueCheckbox = document.createElement('input');
+  valueCheckbox.type = 'checkbox';
+  valueCheckbox.className = 'arg-input';
+  valueCheckbox.style.display = 'none';
+
+  typeSelect.addEventListener('change', function() {
+    var isBoolean = typeSelect.value === 'boolean';
+    valueInput.style.display = isBoolean ? 'none' : '';
+    valueCheckbox.style.display = isBoolean ? '' : 'none';
+  });
+
+  var removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'arg-remove-btn';
+  removeBtn.textContent = '×';
+  removeBtn.onclick = function() { row.remove(); };
+
+  row.appendChild(nameInput);
+  row.appendChild(typeSelect);
+  row.appendChild(valueInput);
+  row.appendChild(valueCheckbox);
+  row.appendChild(removeBtn);
+  script_args_container.appendChild(row);
+}
+
+function collectScriptArgs() {
+  var collectedArgs = {};
+  var collectedFlags = [];
+
+  script_args_container.querySelectorAll('.arg-row:not(.arg-row-manual) .arg-input').forEach((el) => {
+    if (el.type === 'checkbox') {
+      if (el.checked) collectedFlags.push(el.dataset.argName);
+    } else if (el.value) {
+      collectedArgs[el.dataset.argName] = el.value;
+    }
+  });
+
+  script_args_container.querySelectorAll('.arg-row-manual').forEach((row) => {
+    var name = row.querySelector('.arg-name-input').value.trim();
+    if (!name) return;
+
+    if (row.querySelector('.arg-type-select').value === 'boolean') {
+      if (row.querySelector('.arg-input[type="checkbox"]').checked) collectedFlags.push(name);
+    } else {
+      collectedArgs[name] = row.querySelector('.arg-value-input').value;
+    }
+  });
+
+  return {args: collectedArgs, flags: collectedFlags};
+}
+
+script_select.addEventListener('change', function(e) {
+  clearScriptArgs();
+  setAddManualArgVisible(!!script_select.value);
+  if (!script_select.value) return;
+  sendCommand(CommandType.SCRIPT_ARGS, ButtonType.DEFAULT, {script_name: script_select.value});
+});
 
 document.querySelector('#execute').onclick = function(e) {
-  sendCommand(CommandType.EXECUTE_SCRIPT, ButtonType.DEFAULT, {script_name: script_select.value});
+  var collected = collectScriptArgs();
+  sendCommand(CommandType.EXECUTE_SCRIPT, ButtonType.DEFAULT, {script_name: script_select.value, args: collected.args, flags: collected.flags});
 }

@@ -8,6 +8,7 @@
       Upload Script
     </label>
     <input id="upload" type="file">
+    <span class="selected-filename" id="selected-filename"></span>
     <label for="submit-file" class="custom-submit-file-disabled" id="submit-label">Submit Script</label>
     <input type="submit" id="submit-file" disabled>
   </div>
@@ -20,5 +21,7 @@
     </select>
     <input class="button" id="refresh-file-list" type="button" value="⭮">
   </div>
+  <div class="script-args-container" id="script-args-container"></div>
+  <input class="button" id="add-manual-arg" type="button" value="+ Add argument" style="display: none;">
   <input class="button" id="execute" type="button" value="Execute Script">
 </div>

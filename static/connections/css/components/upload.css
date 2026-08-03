@@ -53,6 +53,18 @@ input[type~="submit"] {
   cursor: not-allowed;
 }
 
+.selected-filename {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 6px;
+  max-width: clamp(190px, 16vw, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .material-symbols-outlined {
   font-variation-settings:
     'FILL' 0,

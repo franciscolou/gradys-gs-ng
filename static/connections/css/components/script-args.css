@@ -1,0 +1,137 @@
+.script-args-container {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: clamp(190px, 16vw, 320px);
+  max-width: 100%;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.arg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.arg-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  /* Fixed width (rather than sizing to each label's own text) so every input in the column
+     lines up regardless of how long its argument's name is - a longer name just truncates
+     with an ellipsis instead of pushing its own input further right than the others. */
+  flex: 0 0 92px;
+  width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+input.arg-input[type="text"],
+input.arg-name-input,
+input.arg-value-input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: 2px solid var(--color-accent-dim);
+}
+
+input.arg-input[type="text"]:focus,
+input.arg-name-input:focus,
+input.arg-value-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+input.arg-input[type="checkbox"] {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: var(--color-panel);
+  border: 2px solid var(--color-border-strong);
+  position: relative;
+}
+
+input.arg-input[type="checkbox"]:checked {
+  background-color: var(--color-accent-dim);
+  border-color: var(--color-accent);
+}
+
+input.arg-input[type="checkbox"]:checked::after {
+  content: '\2714';
+  font-size: 12px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-text);
+}
+
+.arg-row-manual {
+  /* Reserves room for the remove-button appendage by borrowing 28px from this row's own
+     width (right edge stays put) rather than shifting the whole .script-args-container -
+     that previously misaligned every argument row (including the auto-discovered ones)
+     against the script dropdown/refresh row above it. This keeps that alignment intact and
+     guarantees the button sits within the container's own box (no risk of it being clipped
+     by an ancestor's overflow:hidden at narrow viewports), at the cost of this row's own
+     inputs starting 28px later than the auto-discovered rows' - an acceptable trade since
+     manual rows are the occasional case.  */
+  position: relative;
+  margin-left: 28px;
+  width: calc(100% - 28px);
+  gap: 4px;
+}
+
+select.arg-type-select {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 4px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: 2px solid var(--color-accent-dim);
+}
+
+select.arg-type-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.arg-remove-btn {
+  /* Taken out of the row's flex flow entirely and appended off its left edge (the opposite
+     side from where it used to sit inline) so it never competes with the name/type/value
+     controls for the row's width - it's an attached appendage, not a fourth flex sibling. */
+  position: absolute;
+  left: -28px;
+  top: 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  width: 28px;
+  height: 32px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+}
+
+.button#add-manual-arg {
+  width: clamp(190px, 16vw, 320px);
+  height: 32px;
+  font-size: 13px;
+  margin-top: 0;
+}
